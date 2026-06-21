@@ -1,0 +1,23 @@
+{
+  "name": "panelcheckers",
+  "version": "1.0.0",
+  "description": "Bulk Login Checker with Puppeteer - DB Config",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node migrations/init.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongodb": "^5.7.0",
+    "puppeteer": "^21.0.0",
+    "proxy-chain": "^2.3.1",
+    "socks-proxy-agent": "^8.0.1",
+    "jszip": "^3.10.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

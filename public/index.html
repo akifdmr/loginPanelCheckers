@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Joker - Panel Login Checker</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --navy: #0f1f33;
+            --navy-soft: #172b45;
+            --blue: #2563eb;
+            --blue-dark: #1d4ed8;
+            --surface: #ffffff;
+            --canvas: #f4f7fb;
+            --border: #dce4ef;
+            --text: #172033;
+            --muted: #667085;
+        }
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; margin: 0; background: var(--canvas); color: var(--text); }
+        .container { min-height: 100vh; }
+        .card { background: white; padding: 22px; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(15, 31, 51, .05); }
+        .flex { display: flex; gap: 20px; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 250px; }
+        textarea { width: 100%; font-family: monospace; padding: 12px; border-radius: 12px; border: 1px solid #ccc; font-size: 14px; }
+        button { background: var(--blue); color: white; border: none; padding: 10px 16px; border-radius: 9px; cursor: pointer; margin-right: 8px; font-weight: 700; }
+        button:hover { background: var(--blue-dark); }
+        button.secondary { background: #35665c; }
+        button.secondary:hover { background: #224a42; }
+        button.danger { background: #7d2d2d; }
+        button.danger:hover { background: #561b1b; }
+        button.active { background: #111827; }
+        input, select { width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #cfd8e5; font-size: 14px; background: white; }
+        input:focus, select:focus, textarea:focus { outline: 3px solid rgba(37, 99, 235, .12); border-color: #80a7f8; }
+        .hidden { display: none !important; }
+        .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top left, #dbeafe, transparent 38%), var(--canvas); }
+        .auth-card { width: min(430px, 100%); margin: 0; }
+        .auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+        .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; background: var(--blue); color: white; border-radius: 12px; font-weight: 900; }
+        .app-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+        .sidebar { position: sticky; top: 0; height: 100vh; background: var(--navy); color: white; padding: 24px 16px; display: flex; flex-direction: column; }
+        .sidebar-brand { padding: 0 10px 24px; border-bottom: 1px solid rgba(255,255,255,.1); }
+        .sidebar-brand h2 { margin: 0; font-size: 19px; }
+        .sidebar-brand p { margin: 6px 0 0; color: #9fb0c7; font-size: 12px; }
+        .nav-group { margin-top: 22px; }
+        .nav-label { padding: 0 12px 8px; color: #7f93ad; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .nav-button { width: 100%; margin: 3px 0; padding: 11px 12px; border-radius: 9px; background: transparent; color: #c8d5e5; text-align: left; font-weight: 650; display: flex; align-items: center; gap: 10px; }
+        .nav-button:hover { background: rgba(255,255,255,.07); color: white; }
+        .nav-button.active { background: var(--blue); color: white; }
+        .sidebar-user { margin-top: auto; padding: 16px 10px 0; border-top: 1px solid rgba(255,255,255,.1); }
+        .sidebar-user .badge { background: rgba(255,255,255,.12); color: #dce8f7; }
+        .sidebar-user-name { margin-top: 9px; font-weight: 800; overflow-wrap: anywhere; }
+        .logout-button { width: 100%; margin: 14px 0 0; background: rgba(255,255,255,.08); color: #ffd5d5; }
+        .main-area { min-width: 0; }
+        .topbar { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; background: white; border-bottom: 1px solid var(--border); }
+        .topbar h1 { margin: 0; font-size: 22px; }
+        .topbar p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+        .content { padding: 26px 28px; }
+        .page-view { display: none; }
+        .page-view.active { display: block; }
+        .page-heading { margin: 0 0 18px; }
+        .page-heading h2 { margin: 0; }
+        .page-heading p { margin: 6px 0 0; color: var(--muted); }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .dashboard-card { border: 1px solid var(--border); border-radius: 14px; background: white; padding: 20px; cursor: pointer; }
+        .dashboard-card:hover { border-color: #93b4f7; box-shadow: 0 10px 26px rgba(37, 99, 235, .08); }
+        .dashboard-card .icon { font-size: 25px; }
+        .dashboard-card h3 { margin: 12px 0 5px; }
+        .dashboard-card p { margin: 0; color: var(--muted); font-size: 13px; }
+        .badge { background: #e8eef6; color: #1e466e; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .split { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+        .table-panel { flex: 2; }
+        .logs-panel { flex: 1; background: #1e1e2f; border-radius: 16px; padding: 12px; color: #cfd7ff; height: 550px; overflow-y: auto; display: flex; flex-direction: column-reverse; font-family: monospace; font-size: 13px; }
+        .log-info { color: #aad0ff; }
+        .log-success { color: #a3e4a3; background: #2a5a2a40; }
+        .log-fail { color: #ffb3b3; background: #8b3a3a40; }
+        .log-error { color: #ff8888; background: #8b3a3a60; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #2c3e66; color: white; }
+        .ok { background: #d4edda; }
+        .fail { background: #f8d7da; }
+        .table-wrapper { max-height: 500px; overflow-y: auto; }
+        .history-toolbar { display: grid; grid-template-columns: 1.4fr 180px 180px; gap: 12px; margin: 12px 0; align-items: end; }
+        .history-summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+        .summary-box { border: 1px solid #d9e1ec; border-radius: 12px; padding: 10px 12px; background: #f8fafc; min-width: 130px; }
+        .summary-box b { display: block; font-size: 18px; color: #18253a; }
+        .summary-box span { font-size: 12px; color: #596579; }
+        .muted { color: #667085; font-size: 12px; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+        .status-pill { display: inline-block; border-radius: 999px; padding: 4px 8px; font-weight: 700; font-size: 12px; }
+        .status-ok { background: #bfe8ca; color: #175b2a; }
+        .status-fail { background: #f5c2c7; color: #842029; }
+        .host-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5eaf1; padding: 8px 0; }
+        .host-row:last-child { border-bottom: 0; }
+        .host-tag { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; }
+        .host-source { color: #667085; font-size: 12px; }
+        .inline-status { margin-top: 10px; border-radius: 10px; padding: 10px 12px; font-size: 13px; background: #edf4ff; color: #1f3f6d; border: 1px solid #c9daf7; }
+        .inline-status.error { background: #fff0f1; color: #842029; border-color: #e4a4aa; }
+        .inline-status.success { background: #eaf7ee; color: #175b2a; border-color: #9bd1aa; }
+        .proxy-status { margin-top: 12px; border: 1px solid #d9e1ec; border-radius: 12px; padding: 12px; background: #f8fafc; }
+        .proxy-status.ok { background: #eaf7ee; border-color: #9bd1aa; }
+        .proxy-status.fail { background: #fff0f1; border-color: #e4a4aa; }
+        .proxy-profile-grid { display: grid; grid-template-columns: minmax(180px, 260px) 1fr auto; gap: 10px; align-items: end; margin-top: 8px; }
+        .proxy-profile-grid button { margin-top: 0; }
+        .inventory-panel { margin-top: 14px; border: 1px solid #d9e1ec; border-radius: 12px; background: #f8fafc; padding: 12px; }
+        .inventory-panel.hidden { display: none; }
+        .inventory-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .inventory-metric { background: #fff; border: 1px solid #e5eaf1; border-radius: 10px; padding: 10px; }
+        .inventory-metric b { display: block; font-size: 18px; color: #18253a; }
+        .inventory-metric span { color: #667085; font-size: 12px; }
+        .permission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 14px; margin-top: 10px; }
+        .permission-option { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .permission-option input { width: auto; }
+        .user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .user-actions button { margin: 0; }
+        .user-permissions { min-width: 300px; }
+        .history-table th, .history-table td { vertical-align: top; }
+        .history-table td:nth-child(2), .history-table td:nth-child(4), .history-table td:nth-child(7) { max-width: 240px; overflow-wrap: anywhere; }
+        .note { font-size: 12px; color: #666; margin-top: 8px; }
+        .mobile-menu { display: none; margin: 0; }
+        @media (max-width: 850px) {
+            .history-toolbar { grid-template-columns: 1fr; }
+            .app-shell { grid-template-columns: 1fr; }
+            .sidebar { position: fixed; z-index: 20; width: 260px; transform: translateX(-100%); transition: transform .2s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .mobile-menu { display: inline-flex; }
+            .content, .topbar { padding-left: 18px; padding-right: 18px; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .split { flex-direction: column; }
+            .proxy-profile-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="login-shell" id="loginShell">
+        <div class="card auth-card" id="loginCard">
+            <div class="auth-brand">
+                <div class="brand-mark">J</div>
+                <div><b>Joker Panel</b><div class="muted">Güvenli yönetim girişi</div></div>
+            </div>
+            <h2>Hesabınıza giriş yapın</h2>
+            <label><b>Kullanıcı adı</b></label>
+            <input id="loginUsername" autocomplete="username" placeholder="Kullanıcı adınız">
+            <div style="height: 12px;"></div>
+            <label><b>Şifre</b></label>
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifreniz">
+            <div style="margin-top: 18px;">
+                <button style="width:100%; margin:0;" onclick="login()">GİRİŞ YAP</button>
+            </div>
+            <div class="note" id="loginNote"></div>
+        </div>
+    </div>
+
+    <div id="appRoot" class="app-shell hidden">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand"><h2>Joker Panel</h2><p>Checker & yönetim merkezi</p></div>
+            <div class="nav-group">
+                <div class="nav-label">Panel</div>
+                <button class="nav-button active" id="nav-dashboard" onclick="navigateTo('dashboard')">⌂ Genel Bakış</button>
+                <button class="nav-button" id="nav-checker" onclick="navigateTo('checker')">▶ Checker İşlemi</button>
+                <button class="nav-button" id="nav-results" onclick="navigateTo('results')">◉ Canlı Sonuçlar</button>
+                <button class="nav-button" id="nav-history" onclick="navigateTo('history')">▤ Raporlar</button>
+            </div>
+            <div class="nav-group">
+                <div class="nav-label">Yönetim</div>
+                <button class="nav-button" id="nav-users" onclick="navigateTo('users')">♟ Kullanıcılar</button>
+                <button class="nav-button" id="nav-hosts" onclick="navigateTo('hosts')">⌁ Yetkili Domainler</button>
+                <button class="nav-button" id="nav-sessions" onclick="navigateTo('sessions')">◷ Oturum Kayıtları</button>
+            </div>
+            <div class="sidebar-user">
+                <span class="badge" id="roleBadge"></span>
+                <div class="sidebar-user-name" id="userLabel"></div>
+                <button class="logout-button" onclick="logout()">Çıkış yap</button>
+            </div>
+        </aside>
+
+        <main class="main-area">
+            <header class="topbar">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button class="mobile-menu" onclick="toggleSidebar()">☰</button>
+                    <div><h1 id="pageTitle">Genel Bakış</h1><p id="pageSubtitle">Yetkiniz olan ekranlara menüden erişebilirsiniz.</p></div>
+                </div>
+            </header>
+            <div class="content">
+                <section class="page-view active" id="view-dashboard">
+                    <div class="page-heading"><h2>Genel Bakış</h2><p>İşlem, rapor ve yönetim ekranlarına hızlı erişim.</p></div>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card" id="dashboard-checker" onclick="navigateTo('checker')"><div class="icon">▶</div><h3>Checker İşlemi</h3><p>Yeni bir liste yükleyin ve kontrol sürecini başlatın.</p></div>
+                        <div class="dashboard-card" id="dashboard-results" onclick="navigateTo('results')"><div class="icon">◉</div><h3>Canlı Sonuçlar</h3><p>Aktif çalışmanın sonuçlarını ve işlem loglarını izleyin.</p></div>
+                        <div class="dashboard-card" id="dashboard-history" onclick="navigateTo('history')"><div class="icon">▤</div><h3>Raporlar</h3><p>Geçmiş kontrolleri filtreleyin ve inceleyin.</p></div>
+                        <div class="dashboard-card" id="dashboard-users" onclick="navigateTo('users')"><div class="icon">♟</div><h3>Kullanıcı Yönetimi</h3><p>Hesap, rol ve permission ayarlarını yönetin.</p></div>
+                        <div class="dashboard-card" id="dashboard-hosts" onclick="navigateTo('hosts')"><div class="icon">⌁</div><h3>Yetkili Domainler</h3><p>Kontrol çalıştırılabilecek hedefleri yönetin.</p></div>
+                        <div class="dashboard-card" id="dashboard-sessions" onclick="navigateTo('sessions')"><div class="icon">◷</div><h3>Oturum Kayıtları</h3><p>Giriş, hatalı giriş ve çıkış hareketlerini inceleyin.</p></div>
+                    </div>
+                </section>
+
+                <section class="page-view" id="view-checker">
+                    <div class="page-heading"><h2>Checker İşlemi</h2><p>Proxy ve test listesini hazırlayıp yeni bir çalışma başlatın.</p></div>
+                    <div class="card" id="checkerCard">
+                        <div id="proxySection">
+                            <label><b>Proxy Profili</b></label>
+                            <div class="proxy-profile-grid">
+                                <div>
+                                    <select id="proxyProfileSelect" onchange="onProxyProfileChange()">
+                                        <option value="custom">Manual SOCKS5</option>
+                                    </select>
+                                </div>
+                                <div><input id="proxyInput" type="password" autocomplete="off" placeholder="socks5://kullanici:sifre@host:port"></div>
+                                <div><button onclick="addProxy()">AKTİF ET</button><button class="danger" onclick="removeProxy()">KALDIR</button></div>
+                            </div>
+                            <div class="note" id="proxyProfileNote">Generic profiller env değişkenleriyle çalışır: PROXY_USA_URL, PROXY_GERMANY_URL, PROXY_NETHERLANDS_URL, PROXY_ASIA_URL.</div>
+                            <div id="proxyStatus" class="proxy-status">Proxy eklenmedi.</div>
+                        </div>
+                        <div style="height: 18px;"></div>
+                        <label><b>URL:Kullanıcı:Şifre listesi</b><br><small>Tek satır veya Şifre / Nick / Bağlantı blokları kabul edilir.</small></label>
+                        <textarea id="creds" rows="13" placeholder="http://127.0.0.1:3000/demo-login:demo:demo123"></textarea>
+            <!-- Checker sayfası - view-checker -->
+<div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+    <button onclick="loadDemoData()">📝 ÖRNEK DOLDUR</button>
+    <button id="startButton" onclick="startTest()" style="background: #2563eb;">▶ BAŞLAT</button>
+    <button id="stopButton" onclick="stopTest()" style="background: #dc3545; display: none;">⏹ DURDUR</button>
+    <button id="groupButton" class="secondary" onclick="groupListByDomain()">▦ GRUPLA</button>
+    <button class="secondary" onclick="analyzeAgencyInventory()">📊 ENVANTER ANALİZ</button>
+    <button onclick="clearAll()" style="background: #6c757d;">🗑 TEMİZLE</button>
+    <span id="checkerStatus" style="margin-left: 10px; font-size: 13px; color: #667085;"></span>
+</div>
+                        <div class="note">Yalnızca yetkili domainler üzerinde işlem çalıştırılabilir.</div>
+                        <div class="inventory-panel hidden" id="inventoryPanel">
+                            <div class="inventory-summary" id="inventorySummary"></div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead><tr><th>Domain</th><th>Kullanıcı</th><th>Şifre</th><th>Durum</th><th>URL</th></tr></thead>
+                                    <tbody id="inventoryBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+<section class="page-view" id="view-results">
+    <div class="page-heading"><h2>Canlı Sonuçlar</h2><p>Aktif çalışmanın sonuçlarını ve çalışma loglarını takip edin.</p></div>
+    <div class="card" id="resultsSection">
+<!-- Results sayfası - view-results -->
+<div style="margin-bottom:14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+    <button onclick="refreshResults()">🔄 YENİLE</button>
+    <button onclick="downloadResults()">📥 RAPORU İNDİR</button>
+    <button id="stopButtonResults" onclick="stopTest()" style="background: #dc3545; display: none;">⏹ DURDUR</button>
+    <button class="danger" onclick="clearAll()">🗑 TEMİZLE</button>
+    <span id="testStatus" style="margin-left: 10px; font-size: 13px; color: #667085; font-weight: 500;"></span>
+</div>
+        <div class="split">
+            <div class="table-panel">
+                <div class="table-wrapper"><table id="resultTable"><thead><tr><th>URL</th><th>Kullanıcı</th><th>Şifre</th><th>Durum</th><th>Mesaj</th></tr></thead><tbody id="tableBody"></tbody></table></div>
+            </div>
+            <div class="logs-panel" id="logPanel"><div>Bekleniyor...</div></div>
+        </div>
+    </div>
+</section>
+
+                <section class="page-view" id="view-history">
+                    <div class="page-heading"><h2>Raporlar</h2><p id="historyScope"></p></div>
+                    <div class="card" id="historyCard">
+                        <h3 id="historyTitle">Check Geçmişi</h3>
+                        <div style="margin: 12px 0;"><button id="historyChecksBtn" onclick="loadHistory('checks')">TÜM CHECK GEÇMİŞİ</button><button id="historySuccessBtn" class="secondary" onclick="loadHistory('successful')">BAŞARILI GEÇMİŞ</button></div>
+                        <div class="history-toolbar">
+                            <div><label><b>Arama</b></label><input id="historySearch" placeholder="Kullanıcı, URL, login, domain veya mesaj ara" oninput="renderHistory()"></div>
+                            <div><label><b>Durum</b></label><select id="historyStatusFilter" onchange="renderHistory()"><option value="all">Tümü</option><option value="success">Başarılı</option><option value="fail">Başarısız</option></select></div>
+                            <div><label><b>Kayıt</b></label><select id="historyLimitFilter" onchange="renderHistory()"><option value="50">Son 50</option><option value="100">Son 100</option><option value="250">Son 250</option><option value="500">Son 500</option></select></div>
+                        </div>
+                        <div class="history-summary">
+                            <div class="summary-box"><b id="historyTotal">0</b><span>Toplam kayıt</span></div><div class="summary-box"><b id="historyOk">0</b><span>Başarılı</span></div><div class="summary-box"><b id="historyFail">0</b><span>Başarısız</span></div><div class="summary-box"><b id="historyUsers">0</b><span>Kullanıcı</span></div>
+                        </div>
+                        <div class="table-wrapper"><table class="history-table"><thead><tr><th>Zaman</th><th>Kullanıcı</th><th>Rol</th><th>Domain</th><th>URL</th><th>Login</th><th>Şifre</th><th>Durum</th><th>Mesaj</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+                    </div>
+                </section>
+
+                <section class="page-view" id="view-users">
+                    <div class="page-heading"><h2>Kullanıcı Yönetimi</h2><p>Hesapları, rolleri, şifreleri ve işlem yetkilerini yönetin.</p></div>
+                    <div class="card" id="usersCard">
+        <h3>Kullanıcı ve Yetki Yönetimi</h3>
+        <div class="muted">Kullanıcılar MongoDB üzerinde tutulur. Rol veya izin değişikliği açık oturumlara sonraki istekte uygulanır.</div>
+        <div class="history-toolbar">
+            <div>
+                <label><b>Kullanıcı adı</b></label>
+                <input id="newUsername" autocomplete="off" placeholder="kullanici.adi">
+            </div>
+            <div>
+                <label><b>Rol</b></label>
+                <select id="newUserRole" onchange="renderCreatePermissions()">
+                    <option value="user">Kullanıcı</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div>
+                <label><b>Şifre</b></label>
+                <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="En az 8 karakter">
+            </div>
+        </div>
+        <div id="newUserPermissions" class="permission-grid"></div>
+        <div style="margin-top: 14px;">
+            <button onclick="createUser()">KULLANICI OLUŞTUR</button>
+            <button class="secondary" onclick="loadUsers()">YENİLE</button>
+        </div>
+        <div class="note" id="usersNote"></div>
+        <div class="table-wrapper" style="margin-top: 16px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kullanıcı</th>
+                        <th>Rol</th>
+                        <th>Aktif</th>
+                        <th>İzinler</th>
+                        <th>Yeni şifre</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+                    </div>
+                </section>
+
+                <section class="page-view" id="view-hosts">
+                    <div class="page-heading"><h2>Yetkili Domainler</h2><p>Checker tarafından erişilebilecek hedef domainleri yönetin.</p></div>
+                    <div class="card" id="allowedHostsCard">
+        <h3>Yetkili Domainler</h3>
+        <div class="muted" id="allowedHostsHelp"></div>
+        <div class="history-toolbar">
+            <div>
+                <label><b>Host ekle</b></label>
+                <textarea id="allowedHostInput" rows="3" placeholder="login.sirket.com&#10;panel.example.net"></textarea>
+            </div>
+            <div>
+                <button onclick="addAllowedHost()">EKLE</button>
+            </div>
+            <div>
+                <button class="secondary" onclick="loadAllowedHosts()">YENİLE</button>
+            </div>
+        </div>
+        <div id="allowedHostStatus" class="inline-status hidden"></div>
+        <div id="allowedHostsList"></div>
+                    </div>
+                </section>
+
+                <section class="page-view" id="view-sessions">
+                    <div class="page-heading"><h2>Oturum Kayıtları</h2><p>Sisteme yapılan giriş, hatalı giriş ve çıkış hareketleri.</p></div>
+                    <div class="card" id="sessionLogsCard">
+        <h3>🔎 Oturum Logları</h3>
+        <div class="muted">Admin görünümü: giriş, hatalı giriş ve çıkış kayıtları.</div>
+        <div style="margin: 12px 0;">
+            <button onclick="loadSessionLogs()">YENİLE</button>
+        </div>
+        <div class="table-wrapper">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Zaman</th>
+                        <th>Kullanıcı</th>
+                        <th>Rol</th>
+                        <th>Olay</th>
+                        <th>Sonuç</th>
+                        <th>IP</th>
+                        <th>Sebep</th>
+                        <th>Tarayıcı</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionLogsBody"></tbody>
+            </table>
+        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    const tbody = document.getElementById('tableBody');
+    const logPanel = document.getElementById('logPanel');
+    const historyBody = document.getElementById('historyBody');
+    const sessionLogsBody = document.getElementById('sessionLogsBody');
+    const allowedHostsList = document.getElementById('allowedHostsList');
+    const usersBody = document.getElementById('usersBody');
+    let eventSource = null;
+    let refreshTimer = null;
+    let totalTests = 0;
+    let currentUser = null;
+    let currentRunId = null;
+    let historyRows = [];
+    let currentHistoryType = 'checks';
+    let permissionCatalog = [];
+    let permissionDefaults = { admin: [], user: [] };
+    let currentView = 'dashboard';
+    let proxyPresets = [];
+    // Değişkenler
+    let isTestRunning = false;
+    
+    const viewMeta = {
+        dashboard: ['Genel Bakış', 'Yetkiniz olan ekranlara menüden erişebilirsiniz.'],
+        checker: ['Checker İşlemi', 'Yeni kontrol çalışması hazırlayın ve başlatın.'],
+        results: ['Canlı Sonuçlar', 'Aktif çalışmayı ve işlem loglarını takip edin.'],
+        history: ['Raporlar', 'Geçmiş kontrol sonuçlarını filtreleyip inceleyin.'],
+        users: ['Kullanıcı Yönetimi', 'Hesap, rol ve permission ayarlarını yönetin.'],
+        hosts: ['Yetkili Domainler', 'Checker hedeflerinin erişim kapsamını yönetin.'],
+        sessions: ['Oturum Kayıtları', 'Kimlik doğrulama hareketlerini inceleyin.']
+    };
+
+    function hasPermission(permission) {
+        return Boolean(currentUser && Array.isArray(currentUser.permissions) && currentUser.permissions.includes(permission));
+    }
+
+// Durdurma fonksiyonu
+async function stopTest() {
+    if (!currentRunId || !isTestRunning) return;
+    
+    if (!confirm('Test durdurulsun mu? Devam eden işlemler iptal edilecek.')) return;
+    
+    try {
+        const res = await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { 
+            method: 'POST' 
+        });
+        const data = await readJson(res, 'Durdurma cevabı okunamadı.');
+        
+        if (res.ok) {
+            isTestRunning = false;
+            document.getElementById('stopButton').style.display = 'none';
+            document.getElementById('startButton').style.display = 'inline-block';
+            showInlineError('⏹ Test durduruldu!');
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        } else {
+            alert('Durdurma hatası: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (err) {
+        alert('Durdurma hatası: ' + err.message);
+    }
+}
+
+
+
+    function canAccessView(view) {
+        if (view === 'dashboard') return true;
+        if (view === 'checker') return hasPermission('checker.run') || hasPermission('proxy.manage') || hasPermission('lists.group');
+        if (view === 'results') return hasPermission('checker.results');
+        if (view === 'history') return hasPermission('history.own');
+        if (view === 'users') return hasPermission('users.manage');
+        if (view === 'hosts') return hasPermission('hosts.manage');
+        if (view === 'sessions') return hasPermission('sessions.view');
+        return false;
+    }
+
+    function setNavigationAccess() {
+        ['checker', 'results', 'history', 'users', 'hosts', 'sessions'].forEach(view => {
+            const allowed = canAccessView(view);
+            const navBtn = document.getElementById(`nav-${view}`);
+            const dashCard = document.getElementById(`dashboard-${view}`);
+            if (navBtn) navBtn.classList.toggle('hidden', !allowed);
+            if (dashCard) dashCard.classList.toggle('hidden', !allowed);
+        });
+    }
+
+    function navigateTo(view) {
+        if (!canAccessView(view)) return;
+        currentView = view;
+        document.querySelectorAll('.page-view').forEach(section => section.classList.remove('active'));
+        document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active'));
+        const viewEl = document.getElementById(`view-${view}`);
+        const navEl = document.getElementById(`nav-${view}`);
+        if (viewEl) viewEl.classList.add('active');
+        if (navEl) navEl.classList.add('active');
+        const meta = viewMeta[view] || viewMeta.dashboard;
+        document.getElementById('pageTitle').textContent = meta[0];
+        document.getElementById('pageSubtitle').textContent = meta[1];
+        document.getElementById('sidebar').classList.remove('open');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (view === 'results' && hasPermission('checker.results')) refreshResults();
+        if (view === 'history' && hasPermission('history.own')) loadHistory(currentHistoryType).catch(err => showInlineError(err.message));
+        if (view === 'users' && hasPermission('users.manage')) loadUsers();
+        if (view === 'hosts' && hasPermission('hosts.manage')) loadAllowedHosts();
+        if (view === 'sessions' && hasPermission('sessions.view')) loadSessionLogs();
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    async function apiFetch(url, options = {}) {
+        const res = await fetch(url, options);
+        if (res.status === 401) {
+            showLogin();
+            throw new Error('Giriş gerekli.');
+        }
+        return res;
+    }
+
+    async function readJson(res, fallbackMessage = 'Sunucu geçersiz cevap döndürdü.') {
+        const text = await res.text();
+        try {
+            return text ? JSON.parse(text) : null;
+        } catch {
+            throw new Error(`${fallbackMessage} HTTP ${res.status}`);
+        }
+    }
+
+    function showInlineError(message) {
+        const div = document.createElement('div');
+        div.className = 'log-error';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logPanel.prepend(div);
+    }
+
+    function showAllowedHostStatus(message, type = 'info') {
+        const status = document.getElementById('allowedHostStatus');
+        if (!status) return;
+        status.textContent = message;
+        status.className = `inline-status ${type}`;
+        status.classList.remove('hidden');
+    }
+
+    function showLogin() {
+        currentUser = null;
+        if (eventSource) eventSource.close();
+        document.getElementById('loginShell').classList.remove('hidden');
+        document.getElementById('appRoot').classList.add('hidden');
+    }
+
+    function showApp(user) {
+        currentUser = user;
+        document.getElementById('loginShell').classList.add('hidden');
+        document.getElementById('appRoot').classList.remove('hidden');
+        document.getElementById('roleBadge').textContent = user.role.toUpperCase();
+        document.getElementById('userLabel').textContent = user.username;
+        document.getElementById('historyScope').textContent = hasPermission('history.all')
+            ? 'Admin görünümü: tüm kullanıcıların yaptığı check kayıtları listelenir.'
+            : 'Kullanıcı görünümü: sadece kendi yaptığınız check kayıtları listelenir.';
+        document.getElementById('proxySection').classList.toggle('hidden', !hasPermission('proxy.manage'));
+        document.getElementById('startButton').classList.toggle('hidden', !hasPermission('checker.run'));
+        document.getElementById('groupButton').classList.toggle('hidden', !hasPermission('lists.group'));
+        setNavigationAccess();
+        navigateTo(canAccessView(currentView) ? currentView : 'dashboard');
+    }
+
+    async function initializeAuthorizedViews() {
+        if (hasPermission('checker.results')) {
+            connectLogStream();
+            await clearAll();
+            await refreshResults();
+        }
+        if (hasPermission('history.own')) await loadHistory('checks');
+        if (hasPermission('proxy.manage')) await loadProxy();
+        if (hasPermission('sessions.view')) await loadSessionLogs();
+        if (hasPermission('hosts.manage')) await loadAllowedHosts();
+        if (hasPermission('users.manage')) await loadUsers();
+    }
+
+    async function checkSession() {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) {
+            showLogin();
+            return;
+        }
+        const data = await readJson(res, 'Oturum bilgisi okunamadı.');
+        showApp(data.user);
+        await initializeAuthorizedViews();
+    }
+
+    async function login() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const note = document.getElementById('loginNote');
+        note.textContent = '';
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await readJson(res, 'Giriş cevabı okunamadı.').catch(err => ({ error: err.message }));
+        if (!res.ok) {
+            note.textContent = data.error || 'Giriş başarısız.';
+            return;
+        }
+        document.getElementById('loginPassword').value = '';
+        showApp(data.user);
+        await initializeAuthorizedViews();
+    }
+
+    async function logout() {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        showLogin();
+    }
+
+    function connectLogStream() {
+        if (eventSource) eventSource.close();
+        eventSource = new EventSource('/api/log-stream');
+        eventSource.onmessage = (e) => {
+            let log = null;
+            try {
+                log = JSON.parse(e.data);
+            } catch {
+                return;
+            }
+            const div = document.createElement('div');
+            div.className = `log-${log.type}`;
+            div.innerHTML = `[${log.timestamp.slice(11,19)}] ${log.message}`;
+            logPanel.prepend(div);
+        };
+        eventSource.onerror = () => console.warn("SSE bağlantı hatası");
+    }
+
+    // refreshResults fonksiyonunu güncelleyin (test bittiğinde butonları geri getir)
+async function refreshResults() {
+    let data = [];
+    if (!currentRunId) {
+        tbody.innerHTML = '';
+        return;
+    }
+    try {
+        const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`);
+        if (!res.ok) {
+            const err = await readJson(res, 'Sonuçlar alınamadı.').catch(() => ({}));
+            throw new Error(err.error || `Sonuçlar alınamadı. HTTP ${res.status}`);
+        }
+        data = await readJson(res, 'Sonuçlar okunamadı.');
+    } catch (err) {
+        showInlineError(err.message);
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+        document.getElementById('startButton').style.display = 'inline-block';
+        document.getElementById('stopButton').style.display = 'none';
+        isTestRunning = false;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    data.forEach(r => {
+        const status = r.status || (r.success === true ? 'success' : (r.success === false ? 'fail' : 'queued'));
+        const pending = status === 'queued' || status === 'running';
+        const rowClass = pending ? '' : (status === 'success' ? 'ok' : 'fail');
+        const statusText = statusLabel(status, r.message);
+        const row = `<tr class="${rowClass}">
+            <td>${escapeHtml(r.baseUrl)}</td>
+            <td>${escapeHtml(r.username)}</td>
+            <td>${escapeHtml(r.password)}</td>
+            <td>${escapeHtml(statusText)}</td>
+            <td>${escapeHtml(r.message || '')}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+    });
+
+    const completed = data.length === totalTests && data.every(item => {
+        const status = item.status || (item.success === true ? 'success' : (item.success === false ? 'fail' : 'queued'));
+        return status !== 'queued' && status !== 'running';
+    });
+    
+    if (totalTests > 0 && completed && !window.popupShown) {
+        window.popupShown = true;
+        isTestRunning = false;
+        document.getElementById('startButton').style.display = 'inline-block';
+        document.getElementById('stopButton').style.display = 'none';
+        
+        const okCount = data.filter(x => x.status === 'success' || x.success === true).length;
+        const failCount = data.filter(x => x.status === 'fail' || x.success === false).length;
+        const mfaCount = data.filter(x => x.status === 'mfa_required').length;
+        const errorCount = data.length - okCount - failCount - mfaCount;
+        alert(`🏁 TEST TAMAMLANDI!\n✅ Başarılı: ${okCount}\n❌ Başarısız: ${failCount}\n🛡 2FA gerekli: ${mfaCount}\n⚠ Çalıştırılamadı: ${errorCount}\nRaporu "İNDİR" butonuyla alabilirsiniz.`);
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+    function statusLabel(status, message) {
+        if (status === 'success') return '✅ BAŞARILI';
+        if (status === 'fail') return '❌ BAŞARISIZ';
+        if (status === 'mfa_required') return '🛡 2FA GEREKLİ';
+        if (status === 'error') return '⚠ ÇALIŞTIRILAMADI';
+        if (status === 'blocked') return '⛔ ENGELLENDİ';
+        if (status === 'running') return '⏳ ÇALIŞIYOR';
+        return message || 'SIRADA';
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
+    }
+
+    function getDomain(value) {
+        if (!value) return '';
+        try {
+            const raw = value.trim();
+            const normalized = raw.startsWith('http') ? raw : `https://${raw}`;
+            return new URL(normalized).hostname.replace(/^www\./, '').toLowerCase();
+        } catch {
+            return '';
+        }
+    }
+
+    function normalizeFieldLabel(value) {
+        return String(value || '')
+            .toLocaleLowerCase('tr-TR')
+            .replace(/[ş]/g, 's')
+            .replace(/[ıiİ]/g, 'i')
+            .replace(/[ğ]/g, 'g')
+            .replace(/[ü]/g, 'u')
+            .replace(/[ö]/g, 'o')
+            .replace(/[ç]/g, 'c')
+            .replace(/[^\p{L}\p{N}]+/gu, '');
+    }
+
+    function extractLabeledValue(line, labels) {
+        const normalized = String(line || '').trim();
+        const colonIndex = normalized.indexOf(':');
+        if (colonIndex === -1) return '';
+        const label = normalizeFieldLabel(normalized.slice(0, colonIndex));
+        return labels.includes(label) ? normalized.slice(colonIndex + 1).trim() : '';
+    }
+
+    function parseCredentialLineForGrouping(line) {
+        const value = String(line || '').trim();
+        if (!value || value.startsWith('###')) return null;
+
+        const lastColon = value.lastIndexOf(':');
+        const secondLastColon = lastColon > -1 ? value.lastIndexOf(':', lastColon - 1) : -1;
+        if (value.includes('://') || (secondLastColon !== -1 && /^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(value.slice(0, secondLastColon)))) {
+            if (secondLastColon === -1) return null;
+            return {
+                url: value.slice(0, secondLastColon),
+                username: value.slice(secondLastColon + 1, lastColon),
+                password: value.slice(lastColon + 1)
+            };
+        }
+        return null;
+    }
+
+    function normalizeCredentialUrl(url) {
+        const raw = String(url || '').trim();
+        if (!raw) return '';
+        if (raw.startsWith('//')) return `https:${raw}`;
+        return raw.startsWith('http') ? raw : `https://${raw}`;
+    }
+
+    function formatCredentialItem(item) {
+        return `${normalizeCredentialUrl(item.url)}:${item.username}:${item.password || ''}`;
+    }
+
+    function maskSecret(value) {
+        const text = String(value || '');
+        if (!text) return '';
+        if (text.length <= 2) return '*'.repeat(text.length);
+        return `${text.slice(0, 1)}${'*'.repeat(Math.max(text.length - 2, 2))}${text.slice(-1)}`;
+    }
+
+    function parseInventoryItems() {
+        const lines = document.getElementById('creds').value.split('\n');
+        const items = [];
+        let block = {};
+
+        const pushItem = item => {
+            if (!item || !item.url || !item.username) return;
+            const url = normalizeCredentialUrl(item.url);
+            items.push({
+                url,
+                domain: getDomain(url) || 'domainsiz',
+                username: String(item.username || '').trim(),
+                password: String(item.password || '')
+            });
+        };
+
+        const flushBlock = () => {
+            if (block.url || block.username || block.password) {
+                pushItem(block);
+                block = {};
+            }
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line || line.startsWith('###')) {
+                if (!line) flushBlock();
+                continue;
+            }
+
+            const password = extractLabeledValue(line, ['sifre', 'password', 'parola']);
+            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email', 'mail']);
+            const url = extractLabeledValue(line, ['baglanti', 'url', 'link']);
+
+            if (password) {
+                if (block.password && (block.url || block.username)) flushBlock();
+                block.password = password;
+                continue;
+            }
+            if (username) {
+                block.username = username;
+                continue;
+            }
+            if (url) {
+                block.url = url;
+                if (block.username) flushBlock();
+                continue;
+            }
+
+            flushBlock();
+            pushItem(parseCredentialLineForGrouping(line));
+        }
+
+        flushBlock();
+        return items;
+    }
+
+    function parseListForGrouping() {
+        const lines = document.getElementById('creds').value.split('\n');
+        const items = [];
+        let block = {};
+
+        const pushItem = item => {
+            if (!item || !item.url || !item.username) return;
+            const domain = getDomain(item.url);
+            items.push({
+                domain: domain || 'domainsiz',
+                line: formatCredentialItem(item)
+            });
+        };
+
+        const flushBlock = () => {
+            if (block.url || block.username || block.password) {
+                pushItem(block);
+                block = {};
+            }
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line || line.startsWith('###')) {
+                if (!line) flushBlock();
+                continue;
+            }
+
+            const password = extractLabeledValue(line, ['sifre', 'password', 'parola']);
+            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email', 'mail']);
+            const url = extractLabeledValue(line, ['baglanti', 'url', 'link']);
+
+            if (password) {
+                if (block.password && (block.url || block.username)) flushBlock();
+                block.password = password;
+                continue;
+            }
+            if (username) {
+                block.username = username;
+                continue;
+            }
+            if (url) {
+                block.url = url;
+                if (block.username) flushBlock();
+                continue;
+            }
+
+            flushBlock();
+            pushItem(parseCredentialLineForGrouping(line));
+        }
+
+        flushBlock();
+        return items;
+    }
+
+    function buildGroupedText(items) {
+        return getGroupsFromItems(items)
+            .map(group => `### ${group.domain} (${group.lines.length})\n${group.lines.join('\n')}`)
+            .join('\n\n');
+    }
+
+    function getGroupsFromItems(items) {
+        const groups = new Map();
+        items.forEach(item => {
+            if (!groups.has(item.domain)) groups.set(item.domain, []);
+            const lines = groups.get(item.domain);
+            if (!lines.includes(item.line)) lines.push(item.line);
+        });
+
+        return [...groups.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([domain, lines]) => ({ domain, lines }));
+    }
+
+    function downloadTextFile(filename, content) {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    async function downloadGroupedZip(groups) {
+        const res = await apiFetch('/api/group-download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groups })
+        });
+        if (!res.ok) {
+            const err = await readJson(res, 'ZIP hata cevabı okunamadı.').catch(() => ({}));
+            throw new Error(err.error || 'ZIP indirilemedi');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'domain-bazli-listeler.zip';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    async function groupListByDomain() {
+        const items = parseListForGrouping();
+        if (!items.length) {
+            alert('Gruplanacak liste bulunamadı.');
+            return;
+        }
+
+        const groups = getGroupsFromItems(items);
+        const groupedText = buildGroupedText(items);
+        document.getElementById('creds').value = groupedText;
+
+        try {
+            await downloadGroupedZip(groups);
+            alert(`${groups.length} domain için liste gruplandı ve ZIP olarak indirildi.`);
+        } catch (err) {
+            downloadTextFile('domain-bazli-liste.txt', groupedText);
+            alert(`ZIP indirilemedi, gruplu TXT indirildi: ${err.message}`);
+        }
+    }
+
+    function buildInventoryRows(items) {
+        const userCounts = new Map();
+        const passCounts = new Map();
+        const exactCounts = new Map();
+
+        items.forEach(item => {
+            const userKey = `${item.domain}|${item.username.toLowerCase()}`;
+            const passKey = item.password;
+            const exactKey = `${item.domain}|${item.username.toLowerCase()}|${item.password}|${item.url}`;
+            userCounts.set(userKey, (userCounts.get(userKey) || 0) + 1);
+            if (passKey) passCounts.set(passKey, (passCounts.get(passKey) || 0) + 1);
+            exactCounts.set(exactKey, (exactCounts.get(exactKey) || 0) + 1);
+        });
+
+        return items.map(item => {
+            const warnings = [];
+            const userKey = `${item.domain}|${item.username.toLowerCase()}`;
+            const exactKey = `${item.domain}|${item.username.toLowerCase()}|${item.password}|${item.url}`;
+            if (exactCounts.get(exactKey) > 1) warnings.push('aynı kayıt tekrar');
+            if (userCounts.get(userKey) > 1) warnings.push('kullanıcı tekrarlı');
+            if (item.password && passCounts.get(item.password) > 1) warnings.push('şifre başka kayıtta da var');
+            if (item.password && item.password.length < 8) warnings.push('kısa şifre');
+            if (!item.domain || item.domain === 'domainsiz') warnings.push('domain okunamadı');
+            return { ...item, warnings };
+        });
+    }
+
+    function renderInventorySummary(rows) {
+        const domains = new Set(rows.map(item => item.domain));
+        const users = new Set(rows.map(item => `${item.domain}|${item.username.toLowerCase()}`));
+        const duplicateUsers = rows.filter(item => item.warnings.includes('kullanıcı tekrarlı')).length;
+        const riskyPasswords = rows.filter(item => item.warnings.includes('kısa şifre') || item.warnings.includes('şifre başka kayıtta da var')).length;
+        const metrics = [
+            ['Toplam kayıt', rows.length],
+            ['Domain', domains.size],
+            ['Tekil kullanıcı', users.size],
+            ['Tekrarlı kullanıcı', duplicateUsers],
+            ['Şifre uyarısı', riskyPasswords]
+        ];
+        document.getElementById('inventorySummary').innerHTML = metrics
+            .map(([label, value]) => `<div class="inventory-metric"><b>${escapeHtml(value)}</b><span>${escapeHtml(label)}</span></div>`)
+            .join('');
+    }
+
+    function analyzeAgencyInventory() {
+        const items = parseInventoryItems();
+        const panel = document.getElementById('inventoryPanel');
+        const body = document.getElementById('inventoryBody');
+        if (!items.length) {
+            panel.classList.remove('hidden');
+            document.getElementById('inventorySummary').innerHTML = '';
+            body.innerHTML = '<tr><td colspan="5">Analiz edilecek kayıt bulunamadı.</td></tr>';
+            return;
+        }
+
+        const rows = buildInventoryRows(items);
+        renderInventorySummary(rows);
+        body.innerHTML = '';
+        rows.forEach(item => {
+            const status = item.warnings.length ? item.warnings.join(', ') : 'temiz';
+            const rowClass = item.warnings.length ? 'fail' : 'ok';
+            const row = `<tr class="${rowClass}">
+                <td>${escapeHtml(item.domain)}</td>
+                <td>${escapeHtml(item.username)}</td>
+                <td>${escapeHtml(maskSecret(item.password))}</td>
+                <td>${escapeHtml(status)}</td>
+                <td>${escapeHtml(item.url)}</td>
+            </tr>`;
+            body.insertAdjacentHTML('beforeend', row);
+        });
+        panel.classList.remove('hidden');
+    }
+
+   async function clearAll() {
+    // Sonuç tablosunu temizle
+    tbody.innerHTML = '';
+    
+    // Log panelini temizle
+    logPanel.innerHTML = '<div>🧹 Temizlendi - Yeni teste hazır</div>';
+    
+    // Inventory panelini gizle
+    const inventoryPanel = document.getElementById('inventoryPanel');
+    if (inventoryPanel) inventoryPanel.classList.add('hidden');
+    
+    // Aktif test varsa durdur
+    if (isTestRunning && currentRunId) {
+        try {
+            await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { method: 'POST' });
+        } catch (e) {
+            console.warn('Durdurma hatası:', e);
+        }
+    }
+    
+    // Sonuç dosyasını temizle
+    if (currentRunId) {
+        try {
+            const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await readJson(res, 'Temizleme cevabı okunamadı.').catch(() => ({}));
+                throw new Error(err.error || `Temizleme başarısız. HTTP ${res.status}`);
+            }
+        } catch (err) {
+            console.warn('Temizleme hatası:', err);
+        }
+    }
+    
+    // Timer'ı temizle
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+    
+    // Değişkenleri sıfırla
+    totalTests = 0;
+    currentRunId = null;
+    window.popupShown = false;
+    isTestRunning = false;
+    
+    // Butonları geri getir
+    document.getElementById('startButton').style.display = 'inline-block';
+    document.getElementById('stopButton').style.display = 'none';
+}
+
+    function loadDemoData() {
+        const origin = window.location.origin;
+        document.getElementById('creds').value = [
+            `${origin}/demo-login:demo:demo123`,
+            `${origin}/demo-login:demo:wrongpass`
+        ].join('\n');
+    }
+
+    function renderProxyProfiles(presets = []) {
+        proxyPresets = Array.isArray(presets) ? presets : [];
+        const select = document.getElementById('proxyProfileSelect');
+        const selected = select.value || 'custom';
+        select.innerHTML = '<option value="custom">Manual SOCKS5</option>';
+        proxyPresets.forEach(preset => {
+            const configuredText = preset.configured ? 'ready' : 'env missing';
+            const option = document.createElement('option');
+            option.value = preset.key;
+            option.textContent = `${preset.label} (${configuredText})`;
+            select.appendChild(option);
+        });
+        select.value = proxyPresets.some(preset => preset.key === selected) ? selected : 'custom';
+        onProxyProfileChange();
+    }
+
+    function onProxyProfileChange() {
+        const select = document.getElementById('proxyProfileSelect');
+        const input = document.getElementById('proxyInput');
+        const note = document.getElementById('proxyProfileNote');
+        const key = select.value;
+        const preset = proxyPresets.find(item => item.key === key);
+        const isCustom = key === 'custom';
+        input.classList.toggle('hidden', !isCustom);
+        input.disabled = !isCustom;
+        if (isCustom) {
+            note.textContent = 'Manual SOCKS5 için bağlantı formatı: socks5://kullanici:sifre@host:port';
+            return;
+        }
+        note.textContent = preset && preset.configured
+            ? `${preset.label} profili hazır. İstekler bu proxy üzerinden çalıştırılacak.`
+            : `${preset ? preset.label : 'Seçili'} profili için sunucuda env proxy URL tanımlı değil.`;
+    }
+
+    function renderProxyStatus(proxy, error = '') {
+        const status = document.getElementById('proxyStatus');
+        if (error) {
+            status.className = 'proxy-status fail';
+            status.textContent = error;
+            return;
+        }
+        if (!proxy || !proxy.configured) {
+            status.className = 'proxy-status';
+            status.textContent = 'Proxy eklenmedi.';
+            return;
+        }
+        const geo = proxy.geo || {};
+        const location = [geo.city, geo.region, geo.country].filter(Boolean).join(', ');
+        const coordinates = geo.latitude !== null && geo.latitude !== undefined
+            ? `${geo.latitude}, ${geo.longitude}`
+            : '-';
+        const profile = proxy.presetLabel ? `${proxy.presetLabel} profili` : 'Manual SOCKS5';
+        const matchText = proxy.countryMatches === false
+            ? ' | Uyarı: çıkış ülkesi beklenen profil ile eşleşmedi'
+            : '';
+        status.className = 'proxy-status ok';
+        status.textContent = `Aktif: ${profile} | ${proxy.label} | Çıkış IP: ${geo.ip || '-'} | Konum: ${location || '-'} | Koordinat: ${coordinates} | Saat dilimi: ${geo.timezone || '-'}${matchText}`;
+    }
+
+    async function loadProxy() {
+        if (!currentUser) return;
+        try {
+            const res = await apiFetch('/api/proxy/list');
+            const data = await readJson(res, 'Proxy bilgisi okunamadı.');
+            renderProxyProfiles(data && data.proxies);
+            const proxy = data && data.active ? data.active : null;
+            if (proxy && proxy.id) {
+                document.getElementById('proxyProfileSelect').value = proxy.id;
+                onProxyProfileChange();
+            }
+            renderProxyStatus(proxy);
+        } catch (err) {
+            renderProxyStatus(null, err.message);
+        }
+    }
+
+    async function addProxy() {
+        const select = document.getElementById('proxyProfileSelect');
+        const input = document.getElementById('proxyInput');
+        const proxyId = select.value;
+        const isCustom = proxyId === 'custom';
+        const connectionString = input.value.trim();
+        if (isCustom && !connectionString) {
+            renderProxyStatus(null, 'Proxy eklenemedi: connection string gerekli.');
+            return;
+        }
+        const status = document.getElementById('proxyStatus');
+        status.className = 'proxy-status';
+        status.textContent = 'Proxy bağlantısı ve konumu doğrulanıyor...';
+        try {
+            const res = await apiFetch('/api/proxy/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(isCustom
+                    ? { mode: 'custom', connectionString }
+                    : { mode: 'preset', proxyId })
+            });
+            const data = await readJson(res, 'Proxy doğrulama cevabı okunamadı.');
+            if (!res.ok) {
+                renderProxyStatus(null, data.error || 'Proxy eklenemedi.');
+                return;
+            }
+            input.value = '';
+            renderProxyStatus(data.proxy);
+        } catch (err) {
+            renderProxyStatus(null, `Proxy eklenemedi: ${err.message}`);
+        }
+    }
+
+    async function removeProxy() {
+        try {
+            const res = await apiFetch('/api/proxy/select', { method: 'DELETE' });
+            if (!res.ok) throw new Error('Proxy kaldırılamadı.');
+            document.getElementById('proxyInput').value = '';
+            document.getElementById('proxyProfileSelect').value = 'custom';
+            onProxyProfileChange();
+            renderProxyStatus(null);
+        } catch (err) {
+            renderProxyStatus(null, err.message);
+        }
+    }
+
+    async function loadAllowedHosts() {
+        if (!hasPermission('hosts.manage')) return;
+        const res = await apiFetch('/api/admin/allowed-hosts');
+        const data = await readJson(res, 'Yetkili domainler okunamadı.');
+        if (!res.ok) {
+            showAllowedHostStatus(data.error || 'Yetkili domainler okunamadı.', 'error');
+            return;
+        }
+        const rootText = data.rootDomains.length
+            ? `Tanımlı kök domainler: ${data.rootDomains.join(', ')}.`
+            : 'Tanımlı kök domain yok.';
+        document.getElementById('allowedHostsHelp').textContent = data.rootDomainEnforced
+            ? `Panelden yalnızca izinli kök domain altındaki hostlar eklenebilir. ${rootText}`
+            : `Panelden geçerli public domainler eklenebilir. ${rootText} Birden fazla domaini satır satır veya virgülle yapıştırabilirsiniz.`;
+        allowedHostsList.innerHTML = '';
+        data.hosts.forEach(host => {
+            const fromEnv = data.envHosts && data.envHosts.includes(host);
+            const row = document.createElement('div');
+            row.className = 'host-row';
+            row.innerHTML = `<div><div class="host-tag">${escapeHtml(host)}</div><div class="host-source">${fromEnv ? 'ENV' : data.persistence.toUpperCase()}</div></div>`;
+            if (!fromEnv) {
+                const button = document.createElement('button');
+                button.className = 'danger';
+                button.textContent = 'SİL';
+                button.addEventListener('click', () => deleteAllowedHost(host));
+                row.appendChild(button);
+            }
+            allowedHostsList.appendChild(row);
+        });
+    }
+
+    async function addAllowedHost() {
+        const input = document.getElementById('allowedHostInput');
+        const hosts = input.value
+            .split(/[\n,;]+/)
+            .map(host => host.trim())
+            .filter(Boolean);
+        if (!hosts.length) return;
+        const res = await apiFetch('/api/admin/allowed-hosts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hosts })
+        });
+        const data = await readJson(res, 'Host ekleme cevabı okunamadı.');
+        if (!res.ok) {
+            const details = Array.isArray(data.skipped) && data.skipped.length
+                ? ` ${data.skipped.map(item => `${item.input}: ${item.error}`).join(' | ')}`
+                : '';
+            showAllowedHostStatus(`${data.error || 'Host eklenemedi.'}${details}`, 'error');
+            return;
+        }
+        const messages = [];
+        if (Array.isArray(data.added) && data.added.length) messages.push(`${data.added.length} host eklendi`);
+        if (Array.isArray(data.existing) && data.existing.length) messages.push(`${data.existing.length} host zaten kayıtlı`);
+        if (Array.isArray(data.skipped) && data.skipped.length) {
+            messages.push(`${data.skipped.length} host atlandı: ${data.skipped.map(item => `${item.input} (${item.error})`).join(', ')}`);
+        }
+        showAllowedHostStatus(messages.join('. ') || 'Host listesi güncellendi.', data.skipped && data.skipped.length ? 'info' : 'success');
+        input.value = '';
+        await loadAllowedHosts();
+    }
+
+    async function deleteAllowedHost(host) {
+        const res = await apiFetch(`/api/admin/allowed-hosts/${encodeURIComponent(host)}`, { method: 'DELETE' });
+        const data = await readJson(res, 'Host silme cevabı okunamadı.');
+        if (!res.ok) {
+            showAllowedHostStatus(data.error || 'Host silinemedi.', 'error');
+            return;
+        }
+        showAllowedHostStatus(`${host} silindi.`, 'success');
+        await loadAllowedHosts();
+    }
+
+    // startTest fonksiyonunu güncelleyin
+async function startTest() {
+    try {
+        const creds = document.getElementById('creds').value;
+        if (!creds.trim()) {
+            alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.');
+            return;
+        }
+
+        await clearAll();
+
+        const res = await apiFetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credsText: creds })
+        });
+        const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
+        if (!res.ok) {
+            alert('Hata: ' + (json.error || 'Bilinmeyen hata'));
+            return;
+        }
+        
+        totalTests = json.total;
+        currentRunId = json.runId;
+        isTestRunning = true;
+        window.popupShown = false;
+        
+        // Butonları güncelle
+        document.getElementById('startButton').style.display = 'none';
+        document.getElementById('stopButton').style.display = 'inline-block';
+        
+        navigateTo('results');
+        alert(`Test başladı! Toplam ${totalTests} deneme sırayla çalışacak.`);
+
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(refreshResults, 1500);
+        refreshResults();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+        showInlineError(err.message);
+        document.getElementById('startButton').style.display = 'inline-block';
+        document.getElementById('stopButton').style.display = 'none';
+        isTestRunning = false;
+    }
+}
+
+
+// ==================== START TEST ====================
+async function startTest() {
+    try {
+        const creds = document.getElementById('creds').value;
+        if (!creds.trim()) {
+            alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.');
+            return;
+        }
+
+        await clearAll();
+
+        const res = await apiFetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credsText: creds })
+        });
+        const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
+        if (!res.ok) {
+            alert('Hata: ' + (json.error || 'Bilinmeyen hata'));
+            return;
+        }
+        
+        totalTests = json.total;
+        currentRunId = json.runId;
+        isTestRunning = true;
+        window.popupShown = false;
+        
+        // ========== TÜM BUTONLARI GÜNCELLE ==========
+        // Checker sayfası butonları
+        document.getElementById('startButton').style.display = 'none';
+        const stopBtn = document.getElementById('stopButton');
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+        
+        // Results sayfası butonları
+        const stopBtnResults = document.getElementById('stopButtonResults');
+        if (stopBtnResults) stopBtnResults.style.display = 'inline-block';
+        
+        // Durum mesajları
+        const statusText = `🔄 Test çalışıyor... (0/${totalTests})`;
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = statusText;
+            checkerStatus.style.color = '#2563eb';
+        }
+        document.getElementById('testStatus').textContent = statusText;
+        document.getElementById('testStatus').style.color = '#2563eb';
+        
+        navigateTo('results');
+        alert(`Test başladı! Toplam ${totalTests} deneme sırayla çalışacak.`);
+
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(refreshResults, 1500);
+        refreshResults();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+        showInlineError(err.message);
+        
+        // Butonları geri getir
+        document.getElementById('startButton').style.display = 'inline-block';
+        const stopBtn = document.getElementById('stopButton');
+        if (stopBtn) stopBtn.style.display = 'none';
+        const stopBtnResults = document.getElementById('stopButtonResults');
+        if (stopBtnResults) stopBtnResults.style.display = 'none';
+        
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = '❌ Test başlatılamadı';
+            checkerStatus.style.color = '#dc3545';
+        }
+        document.getElementById('testStatus').textContent = '❌ Test başlatılamadı';
+        document.getElementById('testStatus').style.color = '#dc3545';
+        isTestRunning = false;
+    }
+}
+
+// ==================== STOP TEST ====================
+async function stopTest() {
+    if (!currentRunId || !isTestRunning) {
+        alert('Aktif test bulunamadı.');
+        return;
+    }
+    
+    if (!confirm('⚠️ Test durdurulsun mu?\n\nDevam eden işlemler iptal edilecek ve sonuçlar kaydedilecektir.')) {
+        return;
+    }
+    
+    try {
+        // Tüm stop butonlarını devre dışı bırak
+        const stopBtns = ['stopButton', 'stopButtonResults'];
+        for (const id of stopBtns) {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏹ DURDURULUYOR...';
+            }
+        }
+        
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = '⏹ Durduruluyor...';
+            checkerStatus.style.color = '#dc3545';
+        }
+        document.getElementById('testStatus').textContent = '⏹ Durduruluyor...';
+        document.getElementById('testStatus').style.color = '#dc3545';
+        
+        const res = await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { 
+            method: 'POST' 
+        });
+        const data = await readJson(res, 'Durdurma cevabı okunamadı.');
+        
+        if (res.ok) {
+            isTestRunning = false;
+            
+            // Tüm butonları geri getir
+            for (const id of ['stopButton', 'stopButtonResults']) {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.style.display = 'none';
+                    btn.disabled = false;
+                    btn.textContent = '⏹ DURDUR';
+                }
+            }
+            document.getElementById('startButton').style.display = 'inline-block';
+            
+            const statusText = `⏹ Test durduruldu (${totalTests} test)`;
+            if (checkerStatus) {
+                checkerStatus.textContent = statusText;
+                checkerStatus.style.color = '#dc3545';
+            }
+            document.getElementById('testStatus').textContent = statusText;
+            document.getElementById('testStatus').style.color = '#dc3545';
+            
+            showInlineError('⏹ Test durduruldu! Sonuçlar kaydedildi.');
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+            await refreshResults();
+        } else {
+            alert('Durdurma hatası: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    } catch (err) {
+        alert('Durdurma hatası: ' + err.message);
+    } finally {
+        for (const id of ['stopButton', 'stopButtonResults']) {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '⏹ DURDUR';
+            }
+        }
+    }
+}
+
+// ==================== REFRESH RESULTS (GÜNCELLENMİŞ) ====================
+async function refreshResults() {
+    let data = [];
+    if (!currentRunId) {
+        tbody.innerHTML = '';
+        const idleText = '⏸ Bekleniyor...';
+        document.getElementById('testStatus').textContent = idleText;
+        document.getElementById('testStatus').style.color = '#667085';
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = idleText;
+            checkerStatus.style.color = '#667085';
+        }
+        return;
+    }
+    try {
+        const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`);
+        if (!res.ok) {
+            const err = await readJson(res, 'Sonuçlar alınamadı.').catch(() => ({}));
+            throw new Error(err.error || `Sonuçlar alınamadı. HTTP ${res.status}`);
+        }
+        data = await readJson(res, 'Sonuçlar okunamadı.');
+    } catch (err) {
+        showInlineError(err.message);
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+        document.getElementById('startButton').style.display = 'inline-block';
+        for (const id of ['stopButton', 'stopButtonResults']) {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        }
+        document.getElementById('testStatus').textContent = '❌ Sonuçlar alınamadı';
+        document.getElementById('testStatus').style.color = '#dc3545';
+        isTestRunning = false;
+        return;
+    }
+    
+    // Tablo satırlarını oluştur
+    tbody.innerHTML = '';
+    let completedCount = 0;
+    data.forEach(r => {
+        const status = r.status || (r.success === true ? 'success' : (r.success === false ? 'fail' : 'queued'));
+        const pending = status === 'queued' || status === 'running';
+        if (!pending) completedCount++;
+        const rowClass = pending ? '' : (status === 'success' ? 'ok' : 'fail');
+        
+        // Mesajı kısalt (çok uzunsa)
+        let message = r.message || '';
+        if (message.length > 80) {
+            message = message.slice(0, 77) + '...';
+        }
+        
+        const statusText = statusLabel(status, message);
+        const row = `<tr class="${rowClass}">
+            <td>${escapeHtml(r.baseUrl)}</td>
+            <td>${escapeHtml(r.username)}</td>
+            <td>${escapeHtml(r.password)}</td>
+            <td>${escapeHtml(statusText)}</td>
+            <td style="max-width: 300px; word-break: break-word; font-size: 12px;">${escapeHtml(message)}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+    });
+
+    // Durum güncelleme
+    if (isTestRunning) {
+        const statusText = `🔄 Test çalışıyor... (${completedCount}/${totalTests})`;
+        document.getElementById('testStatus').textContent = statusText;
+        document.getElementById('testStatus').style.color = '#2563eb';
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = statusText;
+            checkerStatus.style.color = '#2563eb';
+        }
+    }
+
+    // Test tamamlandı mı?
+    const completed = data.length === totalTests && data.every(item => {
+        const status = item.status || (item.success === true ? 'success' : (item.success === false ? 'fail' : 'queued'));
+        return status !== 'queued' && status !== 'running';
+    });
+    
+    if (totalTests > 0 && completed && !window.popupShown) {
+        window.popupShown = true;
+        isTestRunning = false;
+        
+        // Butonları geri getir
+        document.getElementById('startButton').style.display = 'inline-block';
+        for (const id of ['stopButton', 'stopButtonResults']) {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        }
+        
+        const statusText = `✅ Test tamamlandı (${totalTests} test)`;
+        document.getElementById('testStatus').textContent = statusText;
+        document.getElementById('testStatus').style.color = '#198754';
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) {
+            checkerStatus.textContent = statusText;
+            checkerStatus.style.color = '#198754';
+        }
+        
+        const okCount = data.filter(x => x.status === 'success' || x.success === true).length;
+        const failCount = data.filter(x => x.status === 'fail' || x.success === false).length;
+        const mfaCount = data.filter(x => x.status === 'mfa_required').length;
+        const cancelledCount = data.filter(x => x.status === 'cancelled').length;
+        const errorCount = data.length - okCount - failCount - mfaCount - cancelledCount;
+        alert(`🏁 TEST TAMAMLANDI!\n✅ Başarılı: ${okCount}\n❌ Başarısız: ${failCount}\n🛡 2FA gerekli: ${mfaCount}\n⏹ İptal edilen: ${cancelledCount}\n⚠ Çalıştırılamadı: ${errorCount}\nRaporu "İNDİR" butonuyla alabilirsiniz.`);
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+
+    async function downloadResults() {
+        if (!currentRunId) {
+            alert('İndirilecek aktif check sonucu yok.');
+            return;
+        }
+        window.location.href = `/api/download?runId=${encodeURIComponent(currentRunId)}`;
+    }
+
+    async function loadHistory(type) {
+        if (!currentUser) return;
+        currentHistoryType = type;
+        const endpoint = type === 'checks' ? '/api/history/checks' : '/api/history/successful';
+        const res = await apiFetch(endpoint);
+        if (!res.ok) {
+            const err = await readJson(res, 'Geçmiş cevabı okunamadı.').catch(() => ({}));
+            throw new Error(err.error || `Geçmiş alınamadı. HTTP ${res.status}`);
+        }
+        historyRows = await readJson(res, 'Geçmiş okunamadı.');
+        document.getElementById('historyTitle').textContent = type === 'checks'
+            ? '📁 Tüm Check Geçmişi'
+            : '📁 Başarılı Geçmiş';
+        document.getElementById('historyChecksBtn').classList.toggle('active', type === 'checks');
+        document.getElementById('historySuccessBtn').classList.toggle('active', type === 'successful');
+        renderHistory();
+    }
+
+    function sessionEventLabel(event) {
+        if (event === 'login_success') return 'GİRİŞ';
+        if (event === 'login_failed') return 'HATALI GİRİŞ';
+        if (event === 'logout') return 'ÇIKIŞ';
+        return event || '';
+    }
+
+    async function loadSessionLogs() {
+        if (!hasPermission('sessions.view')) return;
+        const res = await apiFetch('/api/admin/session-logs');
+        if (!res.ok) {
+            const err = await readJson(res, 'Oturum logları cevabı okunamadı.').catch(() => ({}));
+            showInlineError(err.error || `Oturum logları alınamadı. HTTP ${res.status}`);
+            return;
+        }
+        const logs = await readJson(res, 'Oturum logları okunamadı.');
+        sessionLogsBody.innerHTML = '';
+        if (!logs.length) {
+            sessionLogsBody.innerHTML = '<tr><td colspan="8">Kayıt yok</td></tr>';
+            return;
+        }
+        logs.forEach(item => {
+            const row = `<tr class="${item.success ? 'ok' : 'fail'}">
+                <td class="mono">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '')}</td>
+                <td>${escapeHtml(item.username)}</td>
+                <td>${escapeHtml(item.role || '')}</td>
+                <td>${escapeHtml(sessionEventLabel(item.event))}</td>
+                <td>${item.success ? 'BAŞARILI' : 'BAŞARISIZ'}</td>
+                <td>${escapeHtml(item.ip || '')}</td>
+                <td>${escapeHtml(item.reason || '')}</td>
+                <td>${escapeHtml(item.userAgent || '')}</td>
+            </tr>`;
+            sessionLogsBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    function permissionCheckboxes(selected, prefix, disabled = false) {
+        const selectedSet = new Set(selected || []);
+        return permissionCatalog.map(permission => `
+            <label class="permission-option">
+                <input type="checkbox"
+                    data-permission="${escapeHtml(permission.key)}"
+                    class="${escapeHtml(prefix)}"
+                    ${selectedSet.has(permission.key) ? 'checked' : ''}
+                    ${disabled ? 'disabled' : ''}>
+                ${escapeHtml(permission.label)}
+            </label>
+        `).join('');
+    }
+
+    function selectedPermissions(selector) {
+        return [...document.querySelectorAll(`${selector}:checked`)].map(input => input.dataset.permission);
+    }
+
+    function renderCreatePermissions() {
+        if (!permissionCatalog.length) return;
+        const role = document.getElementById('newUserRole').value;
+        document.getElementById('newUserPermissions').innerHTML = permissionCheckboxes(
+            permissionDefaults[role] || [],
+            'new-user-permission',
+            role === 'admin'
+        );
+    }
+
+    async function loadUsers() {
+        if (!hasPermission('users.manage')) return;
+        const res = await apiFetch('/api/admin/users');
+        const data = await readJson(res, 'Kullanıcılar okunamadı.');
+        if (!res.ok) {
+            showInlineError(data.error || 'Kullanıcılar okunamadı.');
+            return;
+        }
+        permissionCatalog = data.permissionCatalog || [];
+        permissionDefaults = data.defaults || { admin: [], user: [] };
+        renderCreatePermissions();
+        usersBody.innerHTML = '';
+        if (!data.users.length) {
+            usersBody.innerHTML = '<tr><td colspan="6">Kullanıcı yok</td></tr>';
+            return;
+        }
+        data.users.forEach(user => {
+            const isSelf = user.id === currentUser.id;
+            const permissionClass = `user-permission-${user.id}`;
+            const row = `<tr>
+                <td>
+                    <b>${escapeHtml(user.username)}</b>
+                    <div class="muted">Son giriş: ${escapeHtml(user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Yok')}</div>
+                </td>
+                <td>
+                    <select id="role-${user.id}" onchange="toggleUserPermissionInputs('${user.id}')">
+                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>Kullanıcı</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </td>
+                <td><label class="permission-option"><input id="active-${user.id}" type="checkbox" ${user.active ? 'checked' : ''} ${isSelf ? 'disabled' : ''}> Aktif</label></td>
+                <td class="user-permissions"><div class="permission-grid" id="permissions-${user.id}">${permissionCheckboxes(user.permissions, permissionClass, user.role === 'admin')}</div></td>
+                <td><input id="password-${user.id}" type="password" autocomplete="new-password" placeholder="Değişmeyecek"></td>
+                <td>
+                    <div class="user-actions">
+                        <button onclick="saveUser('${user.id}')">KAYDET</button>
+                        <button class="danger" onclick="deleteUser('${user.id}')" ${isSelf ? 'disabled' : ''}>SİL</button>
+                    </div>
+                </td>
+            </tr>`;
+            usersBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    function toggleUserPermissionInputs(userId) {
+        const role = document.getElementById(`role-${userId}`).value;
+        const inputs = document.querySelectorAll(`.user-permission-${userId}`);
+        inputs.forEach(input => {
+            input.disabled = role === 'admin';
+            if (role === 'admin') input.checked = true;
+        });
+    }
+
+    async function createUser() {
+        const role = document.getElementById('newUserRole').value;
+        const payload = {
+            username: document.getElementById('newUsername').value.trim(),
+            password: document.getElementById('newUserPassword').value,
+            role,
+            active: true,
+            permissions: role === 'admin'
+                ? permissionDefaults.admin
+                : selectedPermissions('.new-user-permission')
+        };
+        const res = await apiFetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await readJson(res, 'Kullanıcı oluşturma cevabı okunamadı.');
+        const note = document.getElementById('usersNote');
+        if (!res.ok) {
+            note.textContent = data.error || 'Kullanıcı oluşturulamadı.';
+            return;
+        }
+        note.textContent = `${data.user.username} oluşturuldu.`;
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newUserPassword').value = '';
+        await loadUsers();
+    }
+
+    async function saveUser(userId) {
+        const role = document.getElementById(`role-${userId}`).value;
+        const payload = {
+            role,
+            active: document.getElementById(`active-${userId}`).checked,
+            permissions: role === 'admin'
+                ? permissionDefaults.admin
+                : selectedPermissions(`.user-permission-${userId}`),
+            password: document.getElementById(`password-${userId}`).value
+        };
+        const res = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await readJson(res, 'Kullanıcı güncelleme cevabı okunamadı.');
+        if (!res.ok) {
+            showInlineError(data.error || 'Kullanıcı güncellenemedi.');
+            return;
+        }
+        await loadUsers();
+        if (userId === currentUser.id) {
+            currentUser = data.user;
+            showApp(currentUser);
+        }
+    }
+
+    async function deleteUser(userId) {
+        if (!confirm('Bu kullanıcı silinsin mi?')) return;
+        const res = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+        const data = await readJson(res, 'Kullanıcı silme cevabı okunamadı.');
+        if (!res.ok) {
+            showInlineError(data.error || 'Kullanıcı silinemedi.');
+            return;
+        }
+        await loadUsers();
+    }
+
+    function renderHistory() {
+        const search = document.getElementById('historySearch').value.trim().toLowerCase();
+        const status = document.getElementById('historyStatusFilter').value;
+        const limit = Number(document.getElementById('historyLimitFilter').value || 50);
+        const scopedRows = historyRows.filter(item => {
+            if (status === 'success' && !item.success) return false;
+            if (status === 'fail' && item.success) return false;
+            if (!search) return true;
+            const text = [
+                item.ownerUsername,
+                item.ownerRole,
+                item.domain,
+                item.url,
+                item.username,
+                item.passwordMasked,
+                item.message,
+                item.success ? 'başarılı success ok' : 'başarısız fail hata'
+            ].join(' ').toLowerCase();
+            return text.includes(search);
+        });
+        const data = scopedRows.slice(0, limit);
+
+        updateHistorySummary(scopedRows);
+        historyBody.innerHTML = '';
+        if (!data.length) {
+            historyBody.innerHTML = '<tr><td colspan="9">Kayıt yok</td></tr>';
+            return;
+        }
+        data.forEach(item => {
+            const createdAt = item.createdAt || item.checkedAt;
+            const timeText = createdAt ? new Date(createdAt).toLocaleString() : '';
+            const statusClass = item.success ? 'status-ok' : 'status-fail';
+            const statusText = item.success ? 'BAŞARILI' : 'BAŞARISIZ';
+            const row = `<tr class="${item.success ? 'ok' : 'fail'}">
+                <td class="mono">${escapeHtml(timeText)}</td>
+                <td>${escapeHtml(item.ownerUsername || currentUser.username)}</td>
+                <td>${escapeHtml(item.ownerRole || '')}</td>
+                <td>${escapeHtml(item.domain || getDomain(item.url || ''))}</td>
+                <td>${escapeHtml(item.url)}</td>
+                <td>${escapeHtml(item.username)}</td>
+                <td>${escapeHtml(item.passwordMasked)}</td>
+                <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+                <td>${escapeHtml(item.message || '')}</td>
+            </tr>`;
+            historyBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    function updateHistorySummary(rows) {
+        const ok = rows.filter(item => item.success).length;
+        const fail = rows.length - ok;
+        const users = new Set(rows.map(item => item.ownerUsername || currentUser.username).filter(Boolean)).size;
+        document.getElementById('historyTotal').textContent = rows.length;
+        document.getElementById('historyOk').textContent = ok;
+        document.getElementById('historyFail').textContent = fail;
+        document.getElementById('historyUsers').textContent = users;
+    }
+
+    window.onload = async () => {
+        document.getElementById('proxyInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addProxy();
+            }
+        });
+        await checkSession();
+    };
+</script>
+</body>
+</html>
