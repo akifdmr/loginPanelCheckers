@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const os = require('os');
-const fs = require('fs').promises;
+const fsSync = require('fs');
+const fs = fsSync.promises;
 const crypto = require('crypto');
 const https = require('https');
 const net = require('net');
@@ -14,6 +15,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const JSZip = require('jszip');
 const ProxyChain = require('proxy-chain');
 const { SocksProxyAgent } = require('socks-proxy-agent');
+const { ensureMongoIndexes, getMongoConfig } = require('./mongo-config');
 
 // ========== PROXY POOL ==========
 const ProxyPool = require('./proxy-pool');
@@ -503,16 +505,21 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
     ];
     if (browserProxyUrl) args.push(`--proxy-server=${browserProxyUrl}`);
     
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
-                          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    
-    return {
+    const launchOptions = {
         headless: BROWSER_HEADLESS,
         slowMo: IS_PRODUCTION || BROWSER_HEADLESS ? 0 : 250,
         userDataDir,
-        args,
-        executablePath: executablePath
+        args
     };
+    const configuredExecutablePath = String(process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
+    const macChromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    if (configuredExecutablePath) {
+        launchOptions.executablePath = configuredExecutablePath;
+    } else if (!IS_PRODUCTION && fsSync.existsSync(macChromePath)) {
+        launchOptions.executablePath = macChromePath;
+    }
+
+    return launchOptions;
 }
 
 async function runBrowserSmokeTest(browser) {
@@ -1367,54 +1374,38 @@ async function saveUserAuditLog(req, action, target, changes = {}) {
 
 async function connectMongo() {
     try {
-        const uri = process.env.MONGODB_CONNECTIONSTRING || process.env.DATABASE_URL;
+        const mongoConfig = getMongoConfig();
         mongoStatus = {
-            configured: Boolean(uri),
-            attempted: Boolean(uri),
+            configured: true,
+            attempted: true,
             connected: false,
-            error: null
+            error: null,
+            source: mongoConfig.source,
+            database: mongoConfig.dbName,
+            authMode: mongoConfig.authMode
         };
-        if (!uri) {
-            console.log('⚠ MongoDB connection string bulunamadı.');
-            mongoStatus.error = 'MongoDB connection string missing';
-            return;
-        }
 
-        console.log('MongoDB bağlantısı başlatılıyor...');
-        let options = {};
-
-        if (uri.includes('MONGODB-X509')) {
-            console.log('🔐 X509 authentication modu aktif...');
-            const certPath = process.env.MONGODB_CERT_PATH;
-            if (certPath && (await fs.access(certPath).then(() => true).catch(() => false))) {
-                options = { tlsCertificateKeyFile: certPath, tlsAllowInvalidCertificates: false };
-                console.log(`🔐 X509 sertifika dosyası kullanılıyor: ${certPath}`);
-            }
-        } else if (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD) {
-            options = {
-                auth: { username: process.env.MONGODB_USERNAME, password: process.env.MONGODB_PASSWORD }
-            };
-        }
-
-        const client = new MongoClient(uri, { ...options, serverSelectionTimeoutMS: 15000 });
+        console.log(`MongoDB bağlantısı başlatılıyor... env=${mongoConfig.source} db=${mongoConfig.dbName} auth=${mongoConfig.authMode}`);
+        const client = new MongoClient(mongoConfig.uri, mongoConfig.clientOptions);
         await client.connect();
-        db = client.db();
+        db = client.db(mongoConfig.dbName);
+        await db.command({ ping: 1 });
         mongoStatus.connected = true;
+        mongoStatus.database = db.databaseName;
         
-        const users = db.collection('users');
-        await users.createIndex({ username: 1 }, { unique: true });
-        await db.collection('check_results').createIndex({ ownerUserId: 1, createdAt: -1 });
-        await db.collection('successful_logins').createIndex({ ownerUserId: 1, createdAt: -1 });
-        await db.collection('session_logs').createIndex({ createdAt: -1 });
-        await db.collection('session_logs').createIndex({ username: 1, createdAt: -1 });
-        await db.collection('user_audit_logs').createIndex({ createdAt: -1 });
-        await db.collection('settings').createIndex({ _id: 1 });
+        const indexStatus = await ensureMongoIndexes(db);
+        mongoStatus.indexes = indexStatus.supported ? 'ready' : 'unsupported';
+        if (!indexStatus.supported) {
+            console.warn(`⚠ ${indexStatus.warning}; bağlantı kullanılmaya devam edecek.`);
+        }
         
         console.log('✅ MongoDB bağlantısı başarılı');
         return client;
     } catch (err) {
         console.error('❌ MongoDB bağlantı hatası:', err.message);
         db = null;
+        mongoStatus.configured = !err.message.includes('connection string missing');
+        mongoStatus.attempted = mongoStatus.configured;
         mongoStatus.connected = false;
         mongoStatus.error = err.message;
         return null;
@@ -2336,8 +2327,9 @@ app.post('/api/group-download', requireAuth, requirePermission(PERMISSIONS.LISTS
 
 // ==================== HEALTH ====================
 app.get('/health', (req, res) => {
-    res.json({
-        ok: true,
+    const healthy = Boolean(db && mongoStatus.connected);
+    res.status(healthy ? 200 : 503).json({
+        ok: healthy,
         service: 'panelcheckers',
         db: db ? 'connected' : 'disabled',
         auth: db ? 'enabled' : 'disabled',
