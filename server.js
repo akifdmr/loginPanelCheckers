@@ -497,7 +497,9 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-crash-reporter',
-        '--disable-crashpad'
+        '--disable-crashpad',
+        '--max-old-space-size=256',
+        '--js-flags="--max-old-space-size=256"'
     ];
     if (browserProxyUrl) args.push(`--proxy-server=${browserProxyUrl}`);
     
