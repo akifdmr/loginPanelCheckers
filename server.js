@@ -1,4 +1,5 @@
 require('dotenv').config();
+const yargs = require('yargs');
 const express = require('express');
 const path = require('path');
 const os = require('os');
@@ -8,6 +9,7 @@ const crypto = require('crypto');
 const https = require('https');
 const net = require('net');
 
+const argv = yargs(process.argv.slice(2)).argv;
 process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR
     || (process.env.RENDER ? '/opt/render/project/src/.cache/puppeteer' : path.join(__dirname, '.cache', 'puppeteer'));
 

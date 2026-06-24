@@ -119,6 +119,11 @@
         .history-table td:nth-child(2), .history-table td:nth-child(4), .history-table td:nth-child(7) { max-width: 240px; overflow-wrap: anywhere; }
         .note { font-size: 12px; color: #666; margin-top: 8px; }
         .mobile-menu { display: none; margin: 0; }
+        .base-url-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .base-url-row label { font-weight: 700; white-space: nowrap; min-width: 90px; }
+        .base-url-row input { flex: 1; min-width: 200px; }
+        .base-url-row button { white-space: nowrap; }
+        .toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
         @media (max-width: 850px) {
             .history-toolbar { grid-template-columns: 1fr; }
             .app-shell { grid-template-columns: 1fr; }
@@ -129,6 +134,8 @@
             .dashboard-grid { grid-template-columns: 1fr; }
             .split { flex-direction: column; }
             .proxy-profile-grid { grid-template-columns: 1fr; }
+            .base-url-row { flex-direction: column; align-items: stretch; }
+            .base-url-row label { min-width: unset; }
         }
     </style>
 </head>
@@ -143,11 +150,11 @@
             <h2>Hesabınıza giriş yapın</h2>
             <label><b>Kullanıcı adı</b></label>
             <input id="loginUsername" autocomplete="username" placeholder="Kullanıcı adınız">
-            <div style="height: 12px;"></div>
+            <div style="height:12px;"></div>
             <label><b>Şifre</b></label>
             <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifreniz">
-            <div style="margin-top: 18px;">
-                <button style="width:100%; margin:0;" onclick="login()">GİRİŞ YAP</button>
+            <div style="margin-top:18px;">
+                <button style="width:100%;margin:0;" onclick="login()">GİRİŞ YAP</button>
             </div>
             <div class="note" id="loginNote"></div>
         </div>
@@ -178,7 +185,7 @@
 
         <main class="main-area">
             <header class="topbar">
-                <div style="display:flex; align-items:center; gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
                     <button class="mobile-menu" onclick="toggleSidebar()">☰</button>
                     <div><h1 id="pageTitle">Genel Bakış</h1><p id="pageSubtitle">Yetkiniz olan ekranlara menüden erişebilirsiniz.</p></div>
                 </div>
@@ -213,19 +220,28 @@
                             <div class="note" id="proxyProfileNote">Generic profiller env değişkenleriyle çalışır: PROXY_USA_URL, PROXY_GERMANY_URL, PROXY_NETHERLANDS_URL, PROXY_ASIA_URL.</div>
                             <div id="proxyStatus" class="proxy-status">Proxy eklenmedi.</div>
                         </div>
-                        <div style="height: 18px;"></div>
-                        <label><b>URL:Kullanıcı:Şifre listesi</b><br><small>Tek satır veya Şifre / Nick / Bağlantı blokları kabul edilir.</small></label>
+                        <div style="height:18px;"></div>
+
+                        <!-- BASE URL SATIRI -->
+                        <div class="base-url-row">
+                            <label for="baseUrlInput">🔗 Base URL</label>
+                            <input id="baseUrlInput" type="text" placeholder="Boş bırakırsanız orijinal URL'ler korunur" value="">
+                            <button class="secondary" onclick="formatWithBaseUrl()">🔄 FORMATLA</button>
+                            <button class="secondary" onclick="resetBaseUrlToDefault()">↺ SIFIRLA</button>
+                        </div>
+
+                        <label><b>URL:Kullanıcı:Şifre listesi</b><br><small>Tek satır veya Şifre / Nick / Bağlantı blokları kabul edilir. "FORMATLA" butonu Base URL doluysa onu kullanır, boşsa mevcut URL'leri korur.</small></label>
                         <textarea id="creds" rows="13" placeholder="http://127.0.0.1:3000/demo-login:demo:demo123"></textarea>
-            <!-- Checker sayfası - view-checker -->
-<div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-    <button onclick="loadDemoData()">📝 ÖRNEK DOLDUR</button>
-    <button id="startButton" onclick="startTest()" style="background: #2563eb;">▶ BAŞLAT</button>
-    <button id="stopButton" onclick="stopTest()" style="background: #dc3545; display: none;">⏹ DURDUR</button>
-    <button id="groupButton" class="secondary" onclick="groupListByDomain()">▦ GRUPLA</button>
-    <button class="secondary" onclick="analyzeAgencyInventory()">📊 ENVANTER ANALİZ</button>
-    <button onclick="clearAll()" style="background: #6c757d;">🗑 TEMİZLE</button>
-    <span id="checkerStatus" style="margin-left: 10px; font-size: 13px; color: #667085;"></span>
-</div>
+
+                        <div class="toolbar-row">
+                            <button onclick="loadDemoData()">📝 ÖRNEK DOLDUR</button>
+                            <button id="startButton" onclick="startTest()" style="background:#2563eb;">▶ BAŞLAT</button>
+                            <button id="stopButton" onclick="stopTest()" style="background:#dc3545;display:none;">⏹ DURDUR</button>
+                            <button id="groupButton" class="secondary" onclick="groupListByDomain()">▦ GRUPLA</button>
+                            <button class="secondary" onclick="analyzeAgencyInventory()">📊 ENVANTER ANALİZ</button>
+                            <button onclick="clearAll()" style="background:#6c757d;">🗑 TEMİZLE</button>
+                            <span id="checkerStatus" style="margin-left:10px;font-size:13px;color:#667085;"></span>
+                        </div>
                         <div class="note">Yalnızca yetkili domainler üzerinde işlem çalıştırılabilir.</div>
                         <div class="inventory-panel hidden" id="inventoryPanel">
                             <div class="inventory-summary" id="inventorySummary"></div>
@@ -238,38 +254,41 @@
                         </div>
                     </div>
                 </section>
-<section class="page-view" id="view-results">
-    <div class="page-heading"><h2>Canlı Sonuçlar</h2><p>Aktif çalışmanın sonuçlarını ve çalışma loglarını takip edin.</p></div>
-    <div class="card" id="resultsSection">
-<!-- Results sayfası - view-results -->
-<div style="margin-bottom:14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-    <button onclick="refreshResults()">🔄 YENİLE</button>
-    <button onclick="downloadResults()">📥 RAPORU İNDİR</button>
-    <button id="stopButtonResults" onclick="stopTest()" style="background: #dc3545; display: none;">⏹ DURDUR</button>
-    <button class="danger" onclick="clearAll()">🗑 TEMİZLE</button>
-    <span id="testStatus" style="margin-left: 10px; font-size: 13px; color: #667085; font-weight: 500;"></span>
-</div>
-        <div class="split">
-            <div class="table-panel">
-                <div class="table-wrapper"><table id="resultTable"><thead><tr><th>URL</th><th>Kullanıcı</th><th>Şifre</th><th>Durum</th><th>Mesaj</th></tr></thead><tbody id="tableBody"></tbody></table></div>
-            </div>
-            <div class="logs-panel" id="logPanel"><div>Bekleniyor...</div></div>
-        </div>
-    </div>
-</section>
+
+                <section class="page-view" id="view-results">
+                    <div class="page-heading"><h2>Canlı Sonuçlar</h2><p>Aktif çalışmanın sonuçlarını ve çalışma loglarını takip edin.</p></div>
+                    <div class="card" id="resultsSection">
+                        <div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                            <button onclick="refreshResults()">🔄 YENİLE</button>
+                            <button onclick="downloadResults()">📥 RAPORU İNDİR</button>
+                            <button id="stopButtonResults" onclick="stopTest()" style="background:#dc3545;display:none;">⏹ DURDUR</button>
+                            <button class="danger" onclick="clearAll()">🗑 TEMİZLE</button>
+                            <span id="testStatus" style="margin-left:10px;font-size:13px;color:#667085;font-weight:500;"></span>
+                        </div>
+                        <div class="split">
+                            <div class="table-panel">
+                                <div class="table-wrapper"><table id="resultTable"><thead><tr><th>URL</th><th>Kullanıcı</th><th>Şifre</th><th>Durum</th><th>Mesaj</th></tr></thead><tbody id="tableBody"></tbody></table></div>
+                            </div>
+                            <div class="logs-panel" id="logPanel"><div>Bekleniyor...</div></div>
+                        </div>
+                    </div>
+                </section>
 
                 <section class="page-view" id="view-history">
                     <div class="page-heading"><h2>Raporlar</h2><p id="historyScope"></p></div>
                     <div class="card" id="historyCard">
                         <h3 id="historyTitle">Check Geçmişi</h3>
-                        <div style="margin: 12px 0;"><button id="historyChecksBtn" onclick="loadHistory('checks')">TÜM CHECK GEÇMİŞİ</button><button id="historySuccessBtn" class="secondary" onclick="loadHistory('successful')">BAŞARILI GEÇMİŞ</button></div>
+                        <div style="margin:12px 0;"><button id="historyChecksBtn" onclick="loadHistory('checks')">TÜM CHECK GEÇMİŞİ</button><button id="historySuccessBtn" class="secondary" onclick="loadHistory('successful')">BAŞARILI GEÇMİŞ</button></div>
                         <div class="history-toolbar">
                             <div><label><b>Arama</b></label><input id="historySearch" placeholder="Kullanıcı, URL, login, domain veya mesaj ara" oninput="renderHistory()"></div>
                             <div><label><b>Durum</b></label><select id="historyStatusFilter" onchange="renderHistory()"><option value="all">Tümü</option><option value="success">Başarılı</option><option value="fail">Başarısız</option></select></div>
                             <div><label><b>Kayıt</b></label><select id="historyLimitFilter" onchange="renderHistory()"><option value="50">Son 50</option><option value="100">Son 100</option><option value="250">Son 250</option><option value="500">Son 500</option></select></div>
                         </div>
                         <div class="history-summary">
-                            <div class="summary-box"><b id="historyTotal">0</b><span>Toplam kayıt</span></div><div class="summary-box"><b id="historyOk">0</b><span>Başarılı</span></div><div class="summary-box"><b id="historyFail">0</b><span>Başarısız</span></div><div class="summary-box"><b id="historyUsers">0</b><span>Kullanıcı</span></div>
+                            <div class="summary-box"><b id="historyTotal">0</b><span>Toplam kayıt</span></div>
+                            <div class="summary-box"><b id="historyOk">0</b><span>Başarılı</span></div>
+                            <div class="summary-box"><b id="historyFail">0</b><span>Başarısız</span></div>
+                            <div class="summary-box"><b id="historyUsers">0</b><span>Kullanıcı</span></div>
                         </div>
                         <div class="table-wrapper"><table class="history-table"><thead><tr><th>Zaman</th><th>Kullanıcı</th><th>Rol</th><th>Domain</th><th>URL</th><th>Login</th><th>Şifre</th><th>Durum</th><th>Mesaj</th></tr></thead><tbody id="historyBody"></tbody></table></div>
                     </div>
@@ -278,96 +297,76 @@
                 <section class="page-view" id="view-users">
                     <div class="page-heading"><h2>Kullanıcı Yönetimi</h2><p>Hesapları, rolleri, şifreleri ve işlem yetkilerini yönetin.</p></div>
                     <div class="card" id="usersCard">
-        <h3>Kullanıcı ve Yetki Yönetimi</h3>
-        <div class="muted">Kullanıcılar MongoDB üzerinde tutulur. Rol veya izin değişikliği açık oturumlara sonraki istekte uygulanır.</div>
-        <div class="history-toolbar">
-            <div>
-                <label><b>Kullanıcı adı</b></label>
-                <input id="newUsername" autocomplete="off" placeholder="kullanici.adi">
-            </div>
-            <div>
-                <label><b>Rol</b></label>
-                <select id="newUserRole" onchange="renderCreatePermissions()">
-                    <option value="user">Kullanıcı</option>
-                    <option value="admin">Admin</option>
-                </select>
-            </div>
-            <div>
-                <label><b>Şifre</b></label>
-                <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="En az 8 karakter">
-            </div>
-        </div>
-        <div id="newUserPermissions" class="permission-grid"></div>
-        <div style="margin-top: 14px;">
-            <button onclick="createUser()">KULLANICI OLUŞTUR</button>
-            <button class="secondary" onclick="loadUsers()">YENİLE</button>
-        </div>
-        <div class="note" id="usersNote"></div>
-        <div class="table-wrapper" style="margin-top: 16px;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Kullanıcı</th>
-                        <th>Rol</th>
-                        <th>Aktif</th>
-                        <th>İzinler</th>
-                        <th>Yeni şifre</th>
-                        <th>İşlem</th>
-                    </tr>
-                </thead>
-                <tbody id="usersBody"></tbody>
-            </table>
-        </div>
+                        <h3>Kullanıcı ve Yetki Yönetimi</h3>
+                        <div class="muted">Kullanıcılar MongoDB üzerinde tutulur. Rol veya izin değişikliği açık oturumlara sonraki istekte uygulanır.</div>
+                        <div class="history-toolbar">
+                            <div>
+                                <label><b>Kullanıcı adı</b></label>
+                                <input id="newUsername" autocomplete="off" placeholder="kullanici.adi">
+                            </div>
+                            <div>
+                                <label><b>Rol</b></label>
+                                <select id="newUserRole" onchange="renderCreatePermissions()">
+                                    <option value="user">Kullanıcı</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label><b>Şifre</b></label>
+                                <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="En az 8 karakter">
+                            </div>
+                        </div>
+                        <div id="newUserPermissions" class="permission-grid"></div>
+                        <div style="margin-top:14px;">
+                            <button onclick="createUser()">KULLANICI OLUŞTUR</button>
+                            <button class="secondary" onclick="loadUsers()">YENİLE</button>
+                        </div>
+                        <div class="note" id="usersNote"></div>
+                        <div class="table-wrapper" style="margin-top:16px;">
+                            <table>
+                                <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Aktif</th><th>İzinler</th><th>Yeni şifre</th><th>İşlem</th></tr></thead>
+                                <tbody id="usersBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
                 <section class="page-view" id="view-hosts">
                     <div class="page-heading"><h2>Yetkili Domainler</h2><p>Checker tarafından erişilebilecek hedef domainleri yönetin.</p></div>
                     <div class="card" id="allowedHostsCard">
-        <h3>Yetkili Domainler</h3>
-        <div class="muted" id="allowedHostsHelp"></div>
-        <div class="history-toolbar">
-            <div>
-                <label><b>Host ekle</b></label>
-                <textarea id="allowedHostInput" rows="3" placeholder="login.sirket.com&#10;panel.example.net"></textarea>
-            </div>
-            <div>
-                <button onclick="addAllowedHost()">EKLE</button>
-            </div>
-            <div>
-                <button class="secondary" onclick="loadAllowedHosts()">YENİLE</button>
-            </div>
-        </div>
-        <div id="allowedHostStatus" class="inline-status hidden"></div>
-        <div id="allowedHostsList"></div>
+                        <h3>Yetkili Domainler</h3>
+                        <div class="muted" id="allowedHostsHelp"></div>
+                        <div class="history-toolbar">
+                            <div>
+                                <label><b>Host ekle</b></label>
+                                <textarea id="allowedHostInput" rows="3" placeholder="login.sirket.com&#10;panel.example.net"></textarea>
+                            </div>
+                            <div>
+                                <button onclick="addAllowedHost()">EKLE</button>
+                            </div>
+                            <div>
+                                <button class="secondary" onclick="loadAllowedHosts()">YENİLE</button>
+                            </div>
+                        </div>
+                        <div id="allowedHostStatus" class="inline-status hidden"></div>
+                        <div id="allowedHostsList"></div>
                     </div>
                 </section>
 
                 <section class="page-view" id="view-sessions">
                     <div class="page-heading"><h2>Oturum Kayıtları</h2><p>Sisteme yapılan giriş, hatalı giriş ve çıkış hareketleri.</p></div>
                     <div class="card" id="sessionLogsCard">
-        <h3>🔎 Oturum Logları</h3>
-        <div class="muted">Admin görünümü: giriş, hatalı giriş ve çıkış kayıtları.</div>
-        <div style="margin: 12px 0;">
-            <button onclick="loadSessionLogs()">YENİLE</button>
-        </div>
-        <div class="table-wrapper">
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th>Zaman</th>
-                        <th>Kullanıcı</th>
-                        <th>Rol</th>
-                        <th>Olay</th>
-                        <th>Sonuç</th>
-                        <th>IP</th>
-                        <th>Sebep</th>
-                        <th>Tarayıcı</th>
-                    </tr>
-                </thead>
-                <tbody id="sessionLogsBody"></tbody>
-            </table>
-        </div>
+                        <h3>🔎 Oturum Logları</h3>
+                        <div class="muted">Admin görünümü: giriş, hatalı giriş ve çıkış kayıtları.</div>
+                        <div style="margin:12px 0;">
+                            <button onclick="loadSessionLogs()">YENİLE</button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="history-table">
+                                <thead><tr><th>Zaman</th><th>Kullanıcı</th><th>Rol</th><th>Olay</th><th>Sonuç</th><th>IP</th><th>Sebep</th><th>Tarayıcı</th></tr></thead>
+                                <tbody id="sessionLogsBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -376,6 +375,9 @@
 </div>
 
 <script>
+    // ========================================================================
+    //  TEMEL DEĞİŞKENLER & YARDIMCILAR
+    // ========================================================================
     const tbody = document.getElementById('tableBody');
     const logPanel = document.getElementById('logPanel');
     const historyBody = document.getElementById('historyBody');
@@ -393,9 +395,8 @@
     let permissionDefaults = { admin: [], user: [] };
     let currentView = 'dashboard';
     let proxyPresets = [];
-    // Değişkenler
     let isTestRunning = false;
-    
+
     const viewMeta = {
         dashboard: ['Genel Bakış', 'Yetkiniz olan ekranlara menüden erişebilirsiniz.'],
         checker: ['Checker İşlemi', 'Yeni kontrol çalışması hazırlayın ve başlatın.'],
@@ -406,40 +407,12 @@
         sessions: ['Oturum Kayıtları', 'Kimlik doğrulama hareketlerini inceleyin.']
     };
 
+    // ========================================================================
+    //  YETKİ KONTROLÜ
+    // ========================================================================
     function hasPermission(permission) {
         return Boolean(currentUser && Array.isArray(currentUser.permissions) && currentUser.permissions.includes(permission));
     }
-
-// Durdurma fonksiyonu
-async function stopTest() {
-    if (!currentRunId || !isTestRunning) return;
-    
-    if (!confirm('Test durdurulsun mu? Devam eden işlemler iptal edilecek.')) return;
-    
-    try {
-        const res = await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { 
-            method: 'POST' 
-        });
-        const data = await readJson(res, 'Durdurma cevabı okunamadı.');
-        
-        if (res.ok) {
-            isTestRunning = false;
-            document.getElementById('stopButton').style.display = 'none';
-            document.getElementById('startButton').style.display = 'inline-block';
-            showInlineError('⏹ Test durduruldu!');
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
-        } else {
-            alert('Durdurma hatası: ' + (data.error || 'Bilinmeyen hata'));
-        }
-    } catch (err) {
-        alert('Durdurma hatası: ' + err.message);
-    }
-}
-
-
 
     function canAccessView(view) {
         if (view === 'dashboard') return true;
@@ -487,8 +460,14 @@ async function stopTest() {
         document.getElementById('sidebar').classList.toggle('open');
     }
 
+    // ========================================================================
+    //  API / AUTH (credentials: include EKLENDİ)
+    // ========================================================================
     async function apiFetch(url, options = {}) {
-        const res = await fetch(url, options);
+        const res = await fetch(url, {
+            ...options,
+            credentials: 'include'   // <-- OTURUM COOKIE'SI GÖNDERİLSİN
+        });
         if (res.status === 401) {
             showLogin();
             throw new Error('Giriş gerekli.');
@@ -533,14 +512,19 @@ async function stopTest() {
         document.getElementById('appRoot').classList.remove('hidden');
         document.getElementById('roleBadge').textContent = user.role.toUpperCase();
         document.getElementById('userLabel').textContent = user.username;
-        document.getElementById('historyScope').textContent = hasPermission('history.all')
-            ? 'Admin görünümü: tüm kullanıcıların yaptığı check kayıtları listelenir.'
-            : 'Kullanıcı görünümü: sadece kendi yaptığınız check kayıtları listelenir.';
+        document.getElementById('historyScope').textContent = hasPermission('history.all') ?
+            'Admin görünümü: tüm kullanıcıların yaptığı check kayıtları listelenir.' :
+            'Kullanıcı görünümü: sadece kendi yaptığınız check kayıtları listelenir.';
         document.getElementById('proxySection').classList.toggle('hidden', !hasPermission('proxy.manage'));
         document.getElementById('startButton').classList.toggle('hidden', !hasPermission('checker.run'));
         document.getElementById('groupButton').classList.toggle('hidden', !hasPermission('lists.group'));
         setNavigationAccess();
         navigateTo(canAccessView(currentView) ? currentView : 'dashboard');
+        // Base URL'i localStorage'dan yükle
+        const savedBaseUrl = localStorage.getItem('joker_baseUrl');
+        if (savedBaseUrl) {
+            document.getElementById('baseUrlInput').value = savedBaseUrl;
+        }
     }
 
     async function initializeAuthorizedViews() {
@@ -557,7 +541,7 @@ async function stopTest() {
     }
 
     async function checkSession() {
-        const res = await fetch('/api/auth/me');
+        const res = await apiFetch('/api/auth/me');
         if (!res.ok) {
             showLogin();
             return;
@@ -567,16 +551,22 @@ async function stopTest() {
         await initializeAuthorizedViews();
     }
 
+    // ========================================================================
+    //  LOGIN (credentials: include EKLENDİ)
+    // ========================================================================
     async function login() {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
         const note = document.getElementById('loginNote');
         note.textContent = '';
+        
         const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',   // <-- OTURUM COOKIE'SI GÖNDERİLSİN
             body: JSON.stringify({ username, password })
         });
+        
         const data = await readJson(res, 'Giriş cevabı okunamadı.').catch(err => ({ error: err.message }));
         if (!res.ok) {
             note.textContent = data.error || 'Giriş başarısız.';
@@ -588,20 +578,20 @@ async function stopTest() {
     }
 
     async function logout() {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await apiFetch('/api/auth/logout', { method: 'POST' });
         showLogin();
     }
 
+    // ========================================================================
+    //  LOG STREAM
+    // ========================================================================
     function connectLogStream() {
         if (eventSource) eventSource.close();
+        // EventSource maalesef credentials: include desteklemiyor, onun için manuel olarak cookie gönderilir (zaten varsa)
         eventSource = new EventSource('/api/log-stream');
         eventSource.onmessage = (e) => {
             let log = null;
-            try {
-                log = JSON.parse(e.data);
-            } catch {
-                return;
-            }
+            try { log = JSON.parse(e.data); } catch { return; }
             const div = document.createElement('div');
             div.className = `log-${log.type}`;
             div.innerHTML = `[${log.timestamp.slice(11,19)}] ${log.message}`;
@@ -610,68 +600,98 @@ async function stopTest() {
         eventSource.onerror = () => console.warn("SSE bağlantı hatası");
     }
 
-    // refreshResults fonksiyonunu güncelleyin (test bittiğinde butonları geri getir)
-async function refreshResults() {
-    let data = [];
-    if (!currentRunId) {
-        tbody.innerHTML = '';
-        return;
-    }
-    try {
-        const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`);
-        if (!res.ok) {
-            const err = await readJson(res, 'Sonuçlar alınamadı.').catch(() => ({}));
-            throw new Error(err.error || `Sonuçlar alınamadı. HTTP ${res.status}`);
+    // ========================================================================
+    //  SONUÇLAR (refresh, status, vs.)
+    // ========================================================================
+    async function refreshResults() {
+        let data = [];
+        if (!currentRunId) {
+            tbody.innerHTML = '';
+            document.getElementById('testStatus').textContent = '⏸ Bekleniyor...';
+            document.getElementById('testStatus').style.color = '#667085';
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = '⏸ Bekleniyor...';
+                checkerStatus.style.color = '#667085'; }
+            return;
         }
-        data = await readJson(res, 'Sonuçlar okunamadı.');
-    } catch (err) {
-        showInlineError(err.message);
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
+        try {
+            const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`);
+            if (!res.ok) {
+                const err = await readJson(res, 'Sonuçlar alınamadı.').catch(() => ({}));
+                throw new Error(err.error || `Sonuçlar alınamadı. HTTP ${res.status}`);
+            }
+            data = await readJson(res, 'Sonuçlar okunamadı.');
+        } catch (err) {
+            showInlineError(err.message);
+            if (refreshTimer) { clearInterval(refreshTimer);
+                refreshTimer = null; }
+            document.getElementById('startButton').style.display = 'inline-block';
+            ['stopButton', 'stopButtonResults'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.style.display = 'none';
+            });
+            document.getElementById('testStatus').textContent = '❌ Sonuçlar alınamadı';
+            document.getElementById('testStatus').style.color = '#dc3545';
+            isTestRunning = false;
+            return;
         }
-        document.getElementById('startButton').style.display = 'inline-block';
-        document.getElementById('stopButton').style.display = 'none';
-        isTestRunning = false;
-        return;
-    }
-    
-    tbody.innerHTML = '';
-    data.forEach(r => {
-        const status = r.status || (r.success === true ? 'success' : (r.success === false ? 'fail' : 'queued'));
-        const pending = status === 'queued' || status === 'running';
-        const rowClass = pending ? '' : (status === 'success' ? 'ok' : 'fail');
-        const statusText = statusLabel(status, r.message);
-        const row = `<tr class="${rowClass}">
-            <td>${escapeHtml(r.baseUrl)}</td>
-            <td>${escapeHtml(r.username)}</td>
-            <td>${escapeHtml(r.password)}</td>
-            <td>${escapeHtml(statusText)}</td>
-            <td>${escapeHtml(r.message || '')}</td>
-        </tr>`;
-        tbody.insertAdjacentHTML('beforeend', row);
-    });
 
-    const completed = data.length === totalTests && data.every(item => {
-        const status = item.status || (item.success === true ? 'success' : (item.success === false ? 'fail' : 'queued'));
-        return status !== 'queued' && status !== 'running';
-    });
-    
-    if (totalTests > 0 && completed && !window.popupShown) {
-        window.popupShown = true;
-        isTestRunning = false;
-        document.getElementById('startButton').style.display = 'inline-block';
-        document.getElementById('stopButton').style.display = 'none';
-        
-        const okCount = data.filter(x => x.status === 'success' || x.success === true).length;
-        const failCount = data.filter(x => x.status === 'fail' || x.success === false).length;
-        const mfaCount = data.filter(x => x.status === 'mfa_required').length;
-        const errorCount = data.length - okCount - failCount - mfaCount;
-        alert(`🏁 TEST TAMAMLANDI!\n✅ Başarılı: ${okCount}\n❌ Başarısız: ${failCount}\n🛡 2FA gerekli: ${mfaCount}\n⚠ Çalıştırılamadı: ${errorCount}\nRaporu "İNDİR" butonuyla alabilirsiniz.`);
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = null;
+        tbody.innerHTML = '';
+        let completedCount = 0;
+        data.forEach(r => {
+            const status = r.status || (r.success === true ? 'success' : (r.success === false ? 'fail' : 'queued'));
+            if (status !== 'queued' && status !== 'running') completedCount++;
+            const rowClass = (status === 'queued' || status === 'running') ? '' : (status === 'success' ? 'ok' :
+                'fail');
+            let message = r.message || '';
+            if (message.length > 80) message = message.slice(0, 77) + '...';
+            const statusText = statusLabel(status, message);
+            const row =
+                `<tr class="${rowClass}"><td>${escapeHtml(r.baseUrl)}</td><td>${escapeHtml(r.username)}</td><td>${escapeHtml(r.password)}</td><td>${escapeHtml(statusText)}</td><td style="max-width:300px;word-break:break-word;font-size:12px;">${escapeHtml(message)}</td></tr>`;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+        if (isTestRunning) {
+            const st = `🔄 Test çalışıyor... (${completedCount}/${totalTests})`;
+            document.getElementById('testStatus').textContent = st;
+            document.getElementById('testStatus').style.color = '#2563eb';
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = st;
+                checkerStatus.style.color = '#2563eb'; }
+        }
+
+        const completed = data.length === totalTests && data.every(item => {
+            const s = item.status || (item.success === true ? 'success' : (item.success === false ? 'fail' :
+                'queued'));
+            return s !== 'queued' && s !== 'running';
+        });
+
+        if (totalTests > 0 && completed && !window.popupShown) {
+            window.popupShown = true;
+            isTestRunning = false;
+            document.getElementById('startButton').style.display = 'inline-block';
+            ['stopButton', 'stopButtonResults'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.style.display = 'none';
+            });
+            const st = `✅ Test tamamlandı (${totalTests} test)`;
+            document.getElementById('testStatus').textContent = st;
+            document.getElementById('testStatus').style.color = '#198754';
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = st;
+                checkerStatus.style.color = '#198754'; }
+            const okCount = data.filter(x => x.status === 'success' || x.success === true).length;
+            const failCount = data.filter(x => x.status === 'fail' || x.success === false).length;
+            const mfaCount = data.filter(x => x.status === 'mfa_required').length;
+            const cancelledCount = data.filter(x => x.status === 'cancelled').length;
+            const errorCount = data.length - okCount - failCount - mfaCount - cancelledCount;
+            alert(
+                `🏁 TEST TAMAMLANDI!\n✅ Başarılı: ${okCount}\n❌ Başarısız: ${failCount}\n🛡 2FA gerekli: ${mfaCount}\n⏹ İptal edilen: ${cancelledCount}\n⚠ Çalıştırılamadı: ${errorCount}\nRaporu "İNDİR" butonuyla alabilirsiniz.`
+                );
+            if (refreshTimer) { clearInterval(refreshTimer);
+                refreshTimer = null; }
+        }
     }
-}
 
     function statusLabel(status, message) {
         if (status === 'success') return '✅ BAŞARILI';
@@ -694,20 +714,14 @@ async function refreshResults() {
             const raw = value.trim();
             const normalized = raw.startsWith('http') ? raw : `https://${raw}`;
             return new URL(normalized).hostname.replace(/^www\./, '').toLowerCase();
-        } catch {
-            return '';
-        }
+        } catch { return ''; }
     }
 
     function normalizeFieldLabel(value) {
-        return String(value || '')
-            .toLocaleLowerCase('tr-TR')
-            .replace(/[ş]/g, 's')
-            .replace(/[ıiİ]/g, 'i')
-            .replace(/[ğ]/g, 'g')
-            .replace(/[ü]/g, 'u')
-            .replace(/[ö]/g, 'o')
-            .replace(/[ç]/g, 'c')
+        return String(value || '').toLocaleLowerCase('tr-TR')
+            .replace(/[ş]/g, 's').replace(/[ıiİ]/g, 'i')
+            .replace(/[ğ]/g, 'g').replace(/[ü]/g, 'u')
+            .replace(/[ö]/g, 'o').replace(/[ç]/g, 'c')
             .replace(/[^\p{L}\p{N}]+/gu, '');
     }
 
@@ -722,16 +736,13 @@ async function refreshResults() {
     function parseCredentialLineForGrouping(line) {
         const value = String(line || '').trim();
         if (!value || value.startsWith('###')) return null;
-
         const lastColon = value.lastIndexOf(':');
         const secondLastColon = lastColon > -1 ? value.lastIndexOf(':', lastColon - 1) : -1;
-        if (value.includes('://') || (secondLastColon !== -1 && /^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(value.slice(0, secondLastColon)))) {
+        if (value.includes('://') || (secondLastColon !== -1 && /^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(value.slice(0,
+                secondLastColon)))) {
             if (secondLastColon === -1) return null;
-            return {
-                url: value.slice(0, secondLastColon),
-                username: value.slice(secondLastColon + 1, lastColon),
-                password: value.slice(lastColon + 1)
-            };
+            return { url: value.slice(0, secondLastColon), username: value.slice(secondLastColon + 1, lastColon),
+                password: value.slice(lastColon + 1) };
         }
         return null;
     }
@@ -751,62 +762,42 @@ async function refreshResults() {
         const text = String(value || '');
         if (!text) return '';
         if (text.length <= 2) return '*'.repeat(text.length);
-        return `${text.slice(0, 1)}${'*'.repeat(Math.max(text.length - 2, 2))}${text.slice(-1)}`;
+        return `${text.slice(0,1)}${'*'.repeat(Math.max(text.length-2,2))}${text.slice(-1)}`;
     }
 
+    // ========================================================================
+    //  PARSE INVENTORY (mevcut mantık)
+    // ========================================================================
     function parseInventoryItems() {
         const lines = document.getElementById('creds').value.split('\n');
         const items = [];
         let block = {};
-
         const pushItem = item => {
             if (!item || !item.url || !item.username) return;
             const url = normalizeCredentialUrl(item.url);
-            items.push({
-                url,
-                domain: getDomain(url) || 'domainsiz',
-                username: String(item.username || '').trim(),
-                password: String(item.password || '')
-            });
+            items.push({ url, domain: getDomain(url) || 'domainsiz', username: String(item.username || '').trim(),
+                password: String(item.password || '') });
         };
-
         const flushBlock = () => {
-            if (block.url || block.username || block.password) {
-                pushItem(block);
-                block = {};
-            }
+            if (block.url || block.username || block.password) { pushItem(block);
+                block = {}; }
         };
-
         for (const rawLine of lines) {
             const line = rawLine.trim();
-            if (!line || line.startsWith('###')) {
-                if (!line) flushBlock();
-                continue;
-            }
-
+            if (!line || line.startsWith('###')) { if (!line) flushBlock(); continue; }
             const password = extractLabeledValue(line, ['sifre', 'password', 'parola']);
-            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email', 'mail']);
+            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email',
+                'mail'
+            ]);
             const url = extractLabeledValue(line, ['baglanti', 'url', 'link']);
-
-            if (password) {
-                if (block.password && (block.url || block.username)) flushBlock();
-                block.password = password;
-                continue;
-            }
-            if (username) {
-                block.username = username;
-                continue;
-            }
-            if (url) {
-                block.url = url;
-                if (block.username) flushBlock();
-                continue;
-            }
-
+            if (password) { if (block.password && (block.url || block.username)) flushBlock();
+                block.password = password; continue; }
+            if (username) { block.username = username; continue; }
+            if (url) { block.url = url; if (block.username) flushBlock(); continue; }
             flushBlock();
-            pushItem(parseCredentialLineForGrouping(line));
+            const parsed = parseCredentialLineForGrouping(line);
+            if (parsed) pushItem(parsed);
         }
-
         flushBlock();
         return items;
     }
@@ -815,61 +806,33 @@ async function refreshResults() {
         const lines = document.getElementById('creds').value.split('\n');
         const items = [];
         let block = {};
-
         const pushItem = item => {
             if (!item || !item.url || !item.username) return;
             const domain = getDomain(item.url);
-            items.push({
-                domain: domain || 'domainsiz',
-                line: formatCredentialItem(item)
-            });
+            items.push({ domain: domain || 'domainsiz', line: formatCredentialItem(item) });
         };
-
         const flushBlock = () => {
-            if (block.url || block.username || block.password) {
-                pushItem(block);
-                block = {};
-            }
+            if (block.url || block.username || block.password) { pushItem(block);
+                block = {}; }
         };
-
         for (const rawLine of lines) {
             const line = rawLine.trim();
-            if (!line || line.startsWith('###')) {
-                if (!line) flushBlock();
-                continue;
-            }
-
+            if (!line || line.startsWith('###')) { if (!line) flushBlock(); continue; }
             const password = extractLabeledValue(line, ['sifre', 'password', 'parola']);
-            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email', 'mail']);
+            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email',
+                'mail'
+            ]);
             const url = extractLabeledValue(line, ['baglanti', 'url', 'link']);
-
-            if (password) {
-                if (block.password && (block.url || block.username)) flushBlock();
-                block.password = password;
-                continue;
-            }
-            if (username) {
-                block.username = username;
-                continue;
-            }
-            if (url) {
-                block.url = url;
-                if (block.username) flushBlock();
-                continue;
-            }
-
+            if (password) { if (block.password && (block.url || block.username)) flushBlock();
+                block.password = password; continue; }
+            if (username) { block.username = username; continue; }
+            if (url) { block.url = url; if (block.username) flushBlock(); continue; }
             flushBlock();
-            pushItem(parseCredentialLineForGrouping(line));
+            const parsed = parseCredentialLineForGrouping(line);
+            if (parsed) pushItem(parsed);
         }
-
         flushBlock();
         return items;
-    }
-
-    function buildGroupedText(items) {
-        return getGroupsFromItems(items)
-            .map(group => `### ${group.domain} (${group.lines.length})\n${group.lines.join('\n')}`)
-            .join('\n\n');
     }
 
     function getGroupsFromItems(items) {
@@ -879,22 +842,14 @@ async function refreshResults() {
             const lines = groups.get(item.domain);
             if (!lines.includes(item.line)) lines.push(item.line);
         });
-
-        return [...groups.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
+        return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
             .map(([domain, lines]) => ({ domain, lines }));
     }
 
-    function downloadTextFile(filename, content) {
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+    function buildGroupedText(items) {
+        return getGroupsFromItems(items)
+            .map(group => `### ${group.domain} (${group.lines.length})\n${group.lines.join('\n')}`)
+            .join('\n\n');
     }
 
     async function downloadGroupedZip(groups) {
@@ -918,17 +873,24 @@ async function refreshResults() {
         URL.revokeObjectURL(url);
     }
 
+    function downloadTextFile(filename, content) {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
     async function groupListByDomain() {
         const items = parseListForGrouping();
-        if (!items.length) {
-            alert('Gruplanacak liste bulunamadı.');
-            return;
-        }
-
+        if (!items.length) { alert('Gruplanacak liste bulunamadı.'); return; }
         const groups = getGroupsFromItems(items);
         const groupedText = buildGroupedText(items);
         document.getElementById('creds').value = groupedText;
-
         try {
             await downloadGroupedZip(groups);
             alert(`${groups.length} domain için liste gruplandı ve ZIP olarak indirildi.`);
@@ -939,10 +901,9 @@ async function refreshResults() {
     }
 
     function buildInventoryRows(items) {
-        const userCounts = new Map();
-        const passCounts = new Map();
-        const exactCounts = new Map();
-
+        const userCounts = new Map(),
+            passCounts = new Map(),
+            exactCounts = new Map();
         items.forEach(item => {
             const userKey = `${item.domain}|${item.username.toLowerCase()}`;
             const passKey = item.password;
@@ -951,7 +912,6 @@ async function refreshResults() {
             if (passKey) passCounts.set(passKey, (passCounts.get(passKey) || 0) + 1);
             exactCounts.set(exactKey, (exactCounts.get(exactKey) || 0) + 1);
         });
-
         return items.map(item => {
             const warnings = [];
             const userKey = `${item.domain}|${item.username.toLowerCase()}`;
@@ -969,7 +929,8 @@ async function refreshResults() {
         const domains = new Set(rows.map(item => item.domain));
         const users = new Set(rows.map(item => `${item.domain}|${item.username.toLowerCase()}`));
         const duplicateUsers = rows.filter(item => item.warnings.includes('kullanıcı tekrarlı')).length;
-        const riskyPasswords = rows.filter(item => item.warnings.includes('kısa şifre') || item.warnings.includes('şifre başka kayıtta da var')).length;
+        const riskyPasswords = rows.filter(item => item.warnings.includes('kısa şifre') || item.warnings.includes(
+            'şifre başka kayıtta da var')).length;
         const metrics = [
             ['Toplam kayıt', rows.length],
             ['Domain', domains.size],
@@ -978,7 +939,8 @@ async function refreshResults() {
             ['Şifre uyarısı', riskyPasswords]
         ];
         document.getElementById('inventorySummary').innerHTML = metrics
-            .map(([label, value]) => `<div class="inventory-metric"><b>${escapeHtml(value)}</b><span>${escapeHtml(label)}</span></div>`)
+            .map(([label, value]) =>
+                `<div class="inventory-metric"><b>${escapeHtml(value)}</b><span>${escapeHtml(label)}</span></div>`)
             .join('');
     }
 
@@ -992,74 +954,147 @@ async function refreshResults() {
             body.innerHTML = '<tr><td colspan="5">Analiz edilecek kayıt bulunamadı.</td></tr>';
             return;
         }
-
         const rows = buildInventoryRows(items);
         renderInventorySummary(rows);
         body.innerHTML = '';
         rows.forEach(item => {
             const status = item.warnings.length ? item.warnings.join(', ') : 'temiz';
             const rowClass = item.warnings.length ? 'fail' : 'ok';
-            const row = `<tr class="${rowClass}">
-                <td>${escapeHtml(item.domain)}</td>
-                <td>${escapeHtml(item.username)}</td>
-                <td>${escapeHtml(maskSecret(item.password))}</td>
-                <td>${escapeHtml(status)}</td>
-                <td>${escapeHtml(item.url)}</td>
-            </tr>`;
-            body.insertAdjacentHTML('beforeend', row);
+            body.insertAdjacentHTML('beforeend',
+                `<tr class="${rowClass}"><td>${escapeHtml(item.domain)}</td><td>${escapeHtml(item.username)}</td><td>${escapeHtml(maskSecret(item.password))}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(item.url)}</td></tr>`
+                );
         });
         panel.classList.remove('hidden');
     }
 
-   async function clearAll() {
-    // Sonuç tablosunu temizle
-    tbody.innerHTML = '';
-    
-    // Log panelini temizle
-    logPanel.innerHTML = '<div>🧹 Temizlendi - Yeni teste hazır</div>';
-    
-    // Inventory panelini gizle
-    const inventoryPanel = document.getElementById('inventoryPanel');
-    if (inventoryPanel) inventoryPanel.classList.add('hidden');
-    
-    // Aktif test varsa durdur
-    if (isTestRunning && currentRunId) {
-        try {
-            await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { method: 'POST' });
-        } catch (e) {
-            console.warn('Durdurma hatası:', e);
-        }
-    }
-    
-    // Sonuç dosyasını temizle
-    if (currentRunId) {
-        try {
-            const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`, { method: 'DELETE' });
-            if (!res.ok) {
-                const err = await readJson(res, 'Temizleme cevabı okunamadı.').catch(() => ({}));
-                throw new Error(err.error || `Temizleme başarısız. HTTP ${res.status}`);
+    // ========================================================================
+    //  BASE URL FORMATLAMA (ESNEK)
+    // ========================================================================
+    function formatWithBaseUrl() {
+        const baseUrl = document.getElementById('baseUrlInput').value.trim();
+        localStorage.setItem('joker_baseUrl', baseUrl);
+
+        const text = document.getElementById('creds').value;
+        const lines = text.split('\n');
+        const result = [];
+        let block = {};
+
+        const flushBlock = () => {
+            if (block.username || block.password) {
+                const username = block.username || '';
+                const password = block.password || '';
+                let url = block.url ? normalizeCredentialUrl(block.url) : '';
+                if (!url && baseUrl) {
+                    url = normalizeCredentialUrl(baseUrl);
+                }
+                if (url) {
+                    result.push(`${url}:${username}:${password}`);
+                } else {
+                    result.push(`${username}:${password}`);
+                }
+                block = {};
             }
-        } catch (err) {
-            console.warn('Temizleme hatası:', err);
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) {
+                flushBlock();
+                result.push('');
+                continue;
+            }
+            if (line.startsWith('###')) {
+                flushBlock();
+                result.push(line);
+                continue;
+            }
+
+            const parsed = parseCredentialLineForGrouping(line);
+            if (parsed) {
+                flushBlock();
+                let finalUrl = baseUrl ? normalizeCredentialUrl(baseUrl) : normalizeCredentialUrl(parsed.url);
+                result.push(`${finalUrl}:${parsed.username}:${parsed.password || ''}`);
+                continue;
+            }
+
+            const password = extractLabeledValue(line, ['sifre', 'password', 'parola']);
+            const username = extractLabeledValue(line, ['nick', 'kullanici', 'username', 'user', 'eposta', 'email',
+                'mail'
+            ]);
+            const url = extractLabeledValue(line, ['baglanti', 'url', 'link']);
+
+            if (password !== '') {
+                if (block.password && (block.url || block.username)) flushBlock();
+                block.password = password;
+                continue;
+            }
+            if (username !== '') {
+                block.username = username;
+                continue;
+            }
+            if (url !== '') {
+                block.url = normalizeCredentialUrl(url);
+                if (block.username) flushBlock();
+                continue;
+            }
+
+            flushBlock();
+            result.push(line);
         }
+        flushBlock();
+
+        document.getElementById('creds').value = result.join('\n');
+        const count = result.filter(l => l && !l.startsWith('###')).length;
+        const msg = baseUrl ? `✅ ${count} satır Base URL ile formatlandı.` : `✅ ${count} satır orijinal URL'ler korunarak formatlandı.`;
+        document.getElementById('checkerStatus').textContent = msg;
+        document.getElementById('checkerStatus').style.color = '#198754';
     }
-    
-    // Timer'ı temizle
-    if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
+
+    function resetBaseUrlToDefault() {
+        document.getElementById('baseUrlInput').value = '';
+        localStorage.setItem('joker_baseUrl', '');
+        document.getElementById('checkerStatus').textContent = '↺ Base URL temizlendi, orijinal URL\'ler kullanılacak.';
+        document.getElementById('checkerStatus').style.color = '#667085';
     }
-    
-    // Değişkenleri sıfırla
-    totalTests = 0;
-    currentRunId = null;
-    window.popupShown = false;
-    isTestRunning = false;
-    
-    // Butonları geri getir
-    document.getElementById('startButton').style.display = 'inline-block';
-    document.getElementById('stopButton').style.display = 'none';
-}
+
+    // ========================================================================
+    //  TEMİZLE
+    // ========================================================================
+    async function clearAll() {
+        tbody.innerHTML = '';
+        logPanel.innerHTML = '<div>🧹 Temizlendi - Yeni teste hazır</div>';
+        const inventoryPanel = document.getElementById('inventoryPanel');
+        if (inventoryPanel) inventoryPanel.classList.add('hidden');
+        if (isTestRunning && currentRunId) {
+            try { await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { method: 'POST' }); } catch (
+                e) { console.warn('Durdurma hatası:', e); }
+        }
+        if (currentRunId) {
+            try {
+                const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    const err = await readJson(res, 'Temizleme cevabı okunamadı.').catch(() => ({}));
+                    throw new Error(err.error || `Temizleme başarısız. HTTP ${res.status}`);
+                }
+            } catch (err) { console.warn('Temizleme hatası:', err); }
+        }
+        if (refreshTimer) { clearInterval(refreshTimer);
+            refreshTimer = null; }
+        totalTests = 0;
+        currentRunId = null;
+        window.popupShown = false;
+        isTestRunning = false;
+        document.getElementById('startButton').style.display = 'inline-block';
+        ['stopButton', 'stopButtonResults'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        });
+        document.getElementById('testStatus').textContent = '⏸ Bekleniyor...';
+        document.getElementById('testStatus').style.color = '#667085';
+        const checkerStatus = document.getElementById('checkerStatus');
+        if (checkerStatus) { checkerStatus.textContent = '🧹 Temizlendi';
+            checkerStatus.style.color = '#667085'; }
+    }
 
     function loadDemoData() {
         const origin = window.location.origin;
@@ -1067,8 +1102,13 @@ async function refreshResults() {
             `${origin}/demo-login:demo:demo123`,
             `${origin}/demo-login:demo:wrongpass`
         ].join('\n');
+        const baseUrl = document.getElementById('baseUrlInput').value.trim();
+        setTimeout(() => formatWithBaseUrl(), 100);
     }
 
+    // ========================================================================
+    //  PROXY
+    // ========================================================================
     function renderProxyProfiles(presets = []) {
         proxyPresets = Array.isArray(presets) ? presets : [];
         const select = document.getElementById('proxyProfileSelect');
@@ -1094,38 +1134,27 @@ async function refreshResults() {
         const isCustom = key === 'custom';
         input.classList.toggle('hidden', !isCustom);
         input.disabled = !isCustom;
-        if (isCustom) {
-            note.textContent = 'Manual SOCKS5 için bağlantı formatı: socks5://kullanici:sifre@host:port';
-            return;
-        }
-        note.textContent = preset && preset.configured
-            ? `${preset.label} profili hazır. İstekler bu proxy üzerinden çalıştırılacak.`
-            : `${preset ? preset.label : 'Seçili'} profili için sunucuda env proxy URL tanımlı değil.`;
+        if (isCustom) { note.textContent = 'Manual SOCKS5 için bağlantı formatı: socks5://kullanici:sifre@host:port'; return; }
+        note.textContent = preset && preset.configured ?
+            `${preset.label} profili hazır. İstekler bu proxy üzerinden çalıştırılacak.` :
+            `${preset ? preset.label : 'Seçili'} profili için sunucuda env proxy URL tanımlı değil.`;
     }
 
     function renderProxyStatus(proxy, error = '') {
         const status = document.getElementById('proxyStatus');
-        if (error) {
-            status.className = 'proxy-status fail';
-            status.textContent = error;
-            return;
-        }
-        if (!proxy || !proxy.configured) {
-            status.className = 'proxy-status';
-            status.textContent = 'Proxy eklenmedi.';
-            return;
-        }
+        if (error) { status.className = 'proxy-status fail';
+            status.textContent = error; return; }
+        if (!proxy || !proxy.configured) { status.className = 'proxy-status';
+            status.textContent = 'Proxy eklenmedi.'; return; }
         const geo = proxy.geo || {};
         const location = [geo.city, geo.region, geo.country].filter(Boolean).join(', ');
-        const coordinates = geo.latitude !== null && geo.latitude !== undefined
-            ? `${geo.latitude}, ${geo.longitude}`
-            : '-';
+        const coordinates = geo.latitude !== null && geo.latitude !== undefined ? `${geo.latitude}, ${geo.longitude}` :
+            '-';
         const profile = proxy.presetLabel ? `${proxy.presetLabel} profili` : 'Manual SOCKS5';
-        const matchText = proxy.countryMatches === false
-            ? ' | Uyarı: çıkış ülkesi beklenen profil ile eşleşmedi'
-            : '';
+        const matchText = proxy.countryMatches === false ? ' | Uyarı: çıkış ülkesi beklenen profil ile eşleşmedi' : '';
         status.className = 'proxy-status ok';
-        status.textContent = `Aktif: ${profile} | ${proxy.label} | Çıkış IP: ${geo.ip || '-'} | Konum: ${location || '-'} | Koordinat: ${coordinates} | Saat dilimi: ${geo.timezone || '-'}${matchText}`;
+        status.textContent =
+            `Aktif: ${profile} | ${proxy.label} | Çıkış IP: ${geo.ip || '-'} | Konum: ${location || '-'} | Koordinat: ${coordinates} | Saat dilimi: ${geo.timezone || '-'}${matchText}`;
     }
 
     async function loadProxy() {
@@ -1135,14 +1164,10 @@ async function refreshResults() {
             const data = await readJson(res, 'Proxy bilgisi okunamadı.');
             renderProxyProfiles(data && data.proxies);
             const proxy = data && data.active ? data.active : null;
-            if (proxy && proxy.id) {
-                document.getElementById('proxyProfileSelect').value = proxy.id;
-                onProxyProfileChange();
-            }
+            if (proxy && proxy.id) { document.getElementById('proxyProfileSelect').value = proxy.id;
+                onProxyProfileChange(); }
             renderProxyStatus(proxy);
-        } catch (err) {
-            renderProxyStatus(null, err.message);
-        }
+        } catch (err) { renderProxyStatus(null, err.message); }
     }
 
     async function addProxy() {
@@ -1151,10 +1176,7 @@ async function refreshResults() {
         const proxyId = select.value;
         const isCustom = proxyId === 'custom';
         const connectionString = input.value.trim();
-        if (isCustom && !connectionString) {
-            renderProxyStatus(null, 'Proxy eklenemedi: connection string gerekli.');
-            return;
-        }
+        if (isCustom && !connectionString) { renderProxyStatus(null, 'Proxy eklenemedi: connection string gerekli.'); return; }
         const status = document.getElementById('proxyStatus');
         status.className = 'proxy-status';
         status.textContent = 'Proxy bağlantısı ve konumu doğrulanıyor...';
@@ -1162,20 +1184,14 @@ async function refreshResults() {
             const res = await apiFetch('/api/proxy/select', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(isCustom
-                    ? { mode: 'custom', connectionString }
-                    : { mode: 'preset', proxyId })
+                body: JSON.stringify(isCustom ? { mode: 'custom', connectionString } : { mode: 'preset',
+                    proxyId })
             });
             const data = await readJson(res, 'Proxy doğrulama cevabı okunamadı.');
-            if (!res.ok) {
-                renderProxyStatus(null, data.error || 'Proxy eklenemedi.');
-                return;
-            }
+            if (!res.ok) { renderProxyStatus(null, data.error || 'Proxy eklenemedi.'); return; }
             input.value = '';
             renderProxyStatus(data.proxy);
-        } catch (err) {
-            renderProxyStatus(null, `Proxy eklenemedi: ${err.message}`);
-        }
+        } catch (err) { renderProxyStatus(null, `Proxy eklenemedi: ${err.message}`); }
     }
 
     async function removeProxy() {
@@ -1186,31 +1202,29 @@ async function refreshResults() {
             document.getElementById('proxyProfileSelect').value = 'custom';
             onProxyProfileChange();
             renderProxyStatus(null);
-        } catch (err) {
-            renderProxyStatus(null, err.message);
-        }
+        } catch (err) { renderProxyStatus(null, err.message); }
     }
 
+    // ========================================================================
+    //  HOSTS (Yetkili Domainler)
+    // ========================================================================
     async function loadAllowedHosts() {
         if (!hasPermission('hosts.manage')) return;
         const res = await apiFetch('/api/admin/allowed-hosts');
         const data = await readJson(res, 'Yetkili domainler okunamadı.');
-        if (!res.ok) {
-            showAllowedHostStatus(data.error || 'Yetkili domainler okunamadı.', 'error');
-            return;
-        }
-        const rootText = data.rootDomains.length
-            ? `Tanımlı kök domainler: ${data.rootDomains.join(', ')}.`
-            : 'Tanımlı kök domain yok.';
-        document.getElementById('allowedHostsHelp').textContent = data.rootDomainEnforced
-            ? `Panelden yalnızca izinli kök domain altındaki hostlar eklenebilir. ${rootText}`
-            : `Panelden geçerli public domainler eklenebilir. ${rootText} Birden fazla domaini satır satır veya virgülle yapıştırabilirsiniz.`;
+        if (!res.ok) { showAllowedHostStatus(data.error || 'Yetkili domainler okunamadı.', 'error'); return; }
+        const rootText = data.rootDomains.length ? `Tanımlı kök domainler: ${data.rootDomains.join(', ')}.` :
+            'Tanımlı kök domain yok.';
+        document.getElementById('allowedHostsHelp').textContent = data.rootDomainEnforced ?
+            `Panelden yalnızca izinli kök domain altındaki hostlar eklenebilir. ${rootText}` :
+            `Panelden geçerli public domainler eklenebilir. ${rootText} Birden fazla domaini satır satır veya virgülle yapıştırabilirsiniz.`;
         allowedHostsList.innerHTML = '';
         data.hosts.forEach(host => {
             const fromEnv = data.envHosts && data.envHosts.includes(host);
             const row = document.createElement('div');
             row.className = 'host-row';
-            row.innerHTML = `<div><div class="host-tag">${escapeHtml(host)}</div><div class="host-source">${fromEnv ? 'ENV' : data.persistence.toUpperCase()}</div></div>`;
+            row.innerHTML =
+                `<div><div class="host-tag">${escapeHtml(host)}</div><div class="host-source">${fromEnv ? 'ENV' : data.persistence.toUpperCase()}</div></div>`;
             if (!fromEnv) {
                 const button = document.createElement('button');
                 button.className = 'danger';
@@ -1224,10 +1238,7 @@ async function refreshResults() {
 
     async function addAllowedHost() {
         const input = document.getElementById('allowedHostInput');
-        const hosts = input.value
-            .split(/[\n,;]+/)
-            .map(host => host.trim())
-            .filter(Boolean);
+        const hosts = input.value.split(/[\n,;]+/).map(host => host.trim()).filter(Boolean);
         if (!hosts.length) return;
         const res = await apiFetch('/api/admin/allowed-hosts', {
             method: 'POST',
@@ -1236,9 +1247,8 @@ async function refreshResults() {
         });
         const data = await readJson(res, 'Host ekleme cevabı okunamadı.');
         if (!res.ok) {
-            const details = Array.isArray(data.skipped) && data.skipped.length
-                ? ` ${data.skipped.map(item => `${item.input}: ${item.error}`).join(' | ')}`
-                : '';
+            const details = Array.isArray(data.skipped) && data.skipped.length ?
+                ` ${data.skipped.map(item => `${item.input}: ${item.error}`).join(' | ')}` : '';
             showAllowedHostStatus(`${data.error || 'Host eklenemedi.'}${details}`, 'error');
             return;
         }
@@ -1246,9 +1256,12 @@ async function refreshResults() {
         if (Array.isArray(data.added) && data.added.length) messages.push(`${data.added.length} host eklendi`);
         if (Array.isArray(data.existing) && data.existing.length) messages.push(`${data.existing.length} host zaten kayıtlı`);
         if (Array.isArray(data.skipped) && data.skipped.length) {
-            messages.push(`${data.skipped.length} host atlandı: ${data.skipped.map(item => `${item.input} (${item.error})`).join(', ')}`);
+            messages.push(
+                `${data.skipped.length} host atlandı: ${data.skipped.map(item => `${item.input} (${item.error})`).join(', ')}`
+                );
         }
-        showAllowedHostStatus(messages.join('. ') || 'Host listesi güncellendi.', data.skipped && data.skipped.length ? 'info' : 'success');
+        showAllowedHostStatus(messages.join('. ') || 'Host listesi güncellendi.', data.skipped && data.skipped.length ?
+            'info' : 'success');
         input.value = '';
         await loadAllowedHosts();
     }
@@ -1256,338 +1269,127 @@ async function refreshResults() {
     async function deleteAllowedHost(host) {
         const res = await apiFetch(`/api/admin/allowed-hosts/${encodeURIComponent(host)}`, { method: 'DELETE' });
         const data = await readJson(res, 'Host silme cevabı okunamadı.');
-        if (!res.ok) {
-            showAllowedHostStatus(data.error || 'Host silinemedi.', 'error');
-            return;
-        }
+        if (!res.ok) { showAllowedHostStatus(data.error || 'Host silinemedi.', 'error'); return; }
         showAllowedHostStatus(`${host} silindi.`, 'success');
         await loadAllowedHosts();
     }
 
-    // startTest fonksiyonunu güncelleyin
-async function startTest() {
-    try {
-        const creds = document.getElementById('creds').value;
-        if (!creds.trim()) {
-            alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.');
-            return;
-        }
+    // ========================================================================
+    //  START / STOP TEST
+    // ========================================================================
+    async function startTest() {
+        try {
+            const creds = document.getElementById('creds').value;
+            if (!creds.trim()) { alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.'); return; }
 
-        await clearAll();
+            await clearAll();
 
-        const res = await apiFetch('/api/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credsText: creds })
-        });
-        const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
-        if (!res.ok) {
-            alert('Hata: ' + (json.error || 'Bilinmeyen hata'));
-            return;
-        }
-        
-        totalTests = json.total;
-        currentRunId = json.runId;
-        isTestRunning = true;
-        window.popupShown = false;
-        
-        // Butonları güncelle
-        document.getElementById('startButton').style.display = 'none';
-        document.getElementById('stopButton').style.display = 'inline-block';
-        
-        navigateTo('results');
-        alert(`Test başladı! Toplam ${totalTests} deneme sırayla çalışacak.`);
+            const res = await apiFetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credsText: creds })
+            });
+            const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
+            if (!res.ok) { alert('Hata: ' + (json.error || 'Bilinmeyen hata')); return; }
 
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(refreshResults, 1500);
-        refreshResults();
-    } catch (err) {
-        alert('Hata: ' + err.message);
-        showInlineError(err.message);
-        document.getElementById('startButton').style.display = 'inline-block';
-        document.getElementById('stopButton').style.display = 'none';
-        isTestRunning = false;
-    }
-}
+            totalTests = json.total;
+            currentRunId = json.runId;
+            isTestRunning = true;
+            window.popupShown = false;
 
+            document.getElementById('startButton').style.display = 'none';
+            const stopBtn = document.getElementById('stopButton');
+            if (stopBtn) stopBtn.style.display = 'inline-block';
+            const stopBtnResults = document.getElementById('stopButtonResults');
+            if (stopBtnResults) stopBtnResults.style.display = 'inline-block';
 
-// ==================== START TEST ====================
-async function startTest() {
-    try {
-        const creds = document.getElementById('creds').value;
-        if (!creds.trim()) {
-            alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.');
-            return;
-        }
-
-        await clearAll();
-
-        const res = await apiFetch('/api/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credsText: creds })
-        });
-        const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
-        if (!res.ok) {
-            alert('Hata: ' + (json.error || 'Bilinmeyen hata'));
-            return;
-        }
-        
-        totalTests = json.total;
-        currentRunId = json.runId;
-        isTestRunning = true;
-        window.popupShown = false;
-        
-        // ========== TÜM BUTONLARI GÜNCELLE ==========
-        // Checker sayfası butonları
-        document.getElementById('startButton').style.display = 'none';
-        const stopBtn = document.getElementById('stopButton');
-        if (stopBtn) stopBtn.style.display = 'inline-block';
-        
-        // Results sayfası butonları
-        const stopBtnResults = document.getElementById('stopButtonResults');
-        if (stopBtnResults) stopBtnResults.style.display = 'inline-block';
-        
-        // Durum mesajları
-        const statusText = `🔄 Test çalışıyor... (0/${totalTests})`;
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = statusText;
-            checkerStatus.style.color = '#2563eb';
-        }
-        document.getElementById('testStatus').textContent = statusText;
-        document.getElementById('testStatus').style.color = '#2563eb';
-        
-        navigateTo('results');
-        alert(`Test başladı! Toplam ${totalTests} deneme sırayla çalışacak.`);
-
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(refreshResults, 1500);
-        refreshResults();
-    } catch (err) {
-        alert('Hata: ' + err.message);
-        showInlineError(err.message);
-        
-        // Butonları geri getir
-        document.getElementById('startButton').style.display = 'inline-block';
-        const stopBtn = document.getElementById('stopButton');
-        if (stopBtn) stopBtn.style.display = 'none';
-        const stopBtnResults = document.getElementById('stopButtonResults');
-        if (stopBtnResults) stopBtnResults.style.display = 'none';
-        
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = '❌ Test başlatılamadı';
-            checkerStatus.style.color = '#dc3545';
-        }
-        document.getElementById('testStatus').textContent = '❌ Test başlatılamadı';
-        document.getElementById('testStatus').style.color = '#dc3545';
-        isTestRunning = false;
-    }
-}
-
-// ==================== STOP TEST ====================
-async function stopTest() {
-    if (!currentRunId || !isTestRunning) {
-        alert('Aktif test bulunamadı.');
-        return;
-    }
-    
-    if (!confirm('⚠️ Test durdurulsun mu?\n\nDevam eden işlemler iptal edilecek ve sonuçlar kaydedilecektir.')) {
-        return;
-    }
-    
-    try {
-        // Tüm stop butonlarını devre dışı bırak
-        const stopBtns = ['stopButton', 'stopButtonResults'];
-        for (const id of stopBtns) {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⏹ DURDURULUYOR...';
-            }
-        }
-        
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = '⏹ Durduruluyor...';
-            checkerStatus.style.color = '#dc3545';
-        }
-        document.getElementById('testStatus').textContent = '⏹ Durduruluyor...';
-        document.getElementById('testStatus').style.color = '#dc3545';
-        
-        const res = await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { 
-            method: 'POST' 
-        });
-        const data = await readJson(res, 'Durdurma cevabı okunamadı.');
-        
-        if (res.ok) {
-            isTestRunning = false;
-            
-            // Tüm butonları geri getir
-            for (const id of ['stopButton', 'stopButtonResults']) {
-                const btn = document.getElementById(id);
-                if (btn) {
-                    btn.style.display = 'none';
-                    btn.disabled = false;
-                    btn.textContent = '⏹ DURDUR';
-                }
-            }
-            document.getElementById('startButton').style.display = 'inline-block';
-            
-            const statusText = `⏹ Test durduruldu (${totalTests} test)`;
-            if (checkerStatus) {
-                checkerStatus.textContent = statusText;
-                checkerStatus.style.color = '#dc3545';
-            }
+            const statusText = `🔄 Test çalışıyor... (0/${totalTests})`;
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = statusText;
+                checkerStatus.style.color = '#2563eb'; }
             document.getElementById('testStatus').textContent = statusText;
+            document.getElementById('testStatus').style.color = '#2563eb';
+
+            navigateTo('results');
+            alert(`Test başladı! Toplam ${totalTests} deneme sırayla çalışacak.`);
+
+            if (refreshTimer) clearInterval(refreshTimer);
+            refreshTimer = setInterval(refreshResults, 1500);
+            refreshResults();
+        } catch (err) {
+            alert('Hata: ' + err.message);
+            showInlineError(err.message);
+            document.getElementById('startButton').style.display = 'inline-block';
+            ['stopButton', 'stopButtonResults'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.style.display = 'none';
+            });
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = '❌ Test başlatılamadı';
+                checkerStatus.style.color = '#dc3545'; }
+            document.getElementById('testStatus').textContent = '❌ Test başlatılamadı';
             document.getElementById('testStatus').style.color = '#dc3545';
-            
-            showInlineError('⏹ Test durduruldu! Sonuçlar kaydedildi.');
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
+            isTestRunning = false;
+        }
+    }
+
+    async function stopTest() {
+        if (!currentRunId || !isTestRunning) { alert('Aktif test bulunamadı.'); return; }
+        if (!confirm('⚠️ Test durdurulsun mu?\n\nDevam eden işlemler iptal edilecek ve sonuçlar kaydedilecektir.')) return;
+        try {
+            ['stopButton', 'stopButtonResults'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) { btn.disabled = true;
+                    btn.textContent = '⏹ DURDURULUYOR...'; }
+            });
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) { checkerStatus.textContent = '⏹ Durduruluyor...';
+                checkerStatus.style.color = '#dc3545'; }
+            document.getElementById('testStatus').textContent = '⏹ Durduruluyor...';
+            document.getElementById('testStatus').style.color = '#dc3545';
+
+            const res = await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { method: 'POST' });
+            const data = await readJson(res, 'Durdurma cevabı okunamadı.');
+            if (res.ok) {
+                isTestRunning = false;
+                document.getElementById('startButton').style.display = 'inline-block';
+                ['stopButton', 'stopButtonResults'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) { btn.style.display = 'none';
+                        btn.disabled = false;
+                        btn.textContent = '⏹ DURDUR'; }
+                });
+                const st = `⏹ Test durduruldu (${totalTests} test)`;
+                if (checkerStatus) { checkerStatus.textContent = st;
+                    checkerStatus.style.color = '#dc3545'; }
+                document.getElementById('testStatus').textContent = st;
+                document.getElementById('testStatus').style.color = '#dc3545';
+                showInlineError('⏹ Test durduruldu! Sonuçlar kaydedildi.');
+                if (refreshTimer) { clearInterval(refreshTimer);
+                    refreshTimer = null; }
+                await refreshResults();
+            } else {
+                alert('Durdurma hatası: ' + (data.error || 'Bilinmeyen hata'));
             }
-            await refreshResults();
-        } else {
-            alert('Durdurma hatası: ' + (data.error || 'Bilinmeyen hata'));
-        }
-    } catch (err) {
-        alert('Durdurma hatası: ' + err.message);
-    } finally {
-        for (const id of ['stopButton', 'stopButtonResults']) {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = '⏹ DURDUR';
-            }
+        } catch (err) {
+            alert('Durdurma hatası: ' + err.message);
+        } finally {
+            ['stopButton', 'stopButtonResults'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) { btn.disabled = false;
+                    btn.textContent = '⏹ DURDUR'; }
+            });
         }
     }
-}
-
-// ==================== REFRESH RESULTS (GÜNCELLENMİŞ) ====================
-async function refreshResults() {
-    let data = [];
-    if (!currentRunId) {
-        tbody.innerHTML = '';
-        const idleText = '⏸ Bekleniyor...';
-        document.getElementById('testStatus').textContent = idleText;
-        document.getElementById('testStatus').style.color = '#667085';
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = idleText;
-            checkerStatus.style.color = '#667085';
-        }
-        return;
-    }
-    try {
-        const res = await apiFetch(`/api/results?runId=${encodeURIComponent(currentRunId)}`);
-        if (!res.ok) {
-            const err = await readJson(res, 'Sonuçlar alınamadı.').catch(() => ({}));
-            throw new Error(err.error || `Sonuçlar alınamadı. HTTP ${res.status}`);
-        }
-        data = await readJson(res, 'Sonuçlar okunamadı.');
-    } catch (err) {
-        showInlineError(err.message);
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
-        }
-        document.getElementById('startButton').style.display = 'inline-block';
-        for (const id of ['stopButton', 'stopButtonResults']) {
-            const btn = document.getElementById(id);
-            if (btn) btn.style.display = 'none';
-        }
-        document.getElementById('testStatus').textContent = '❌ Sonuçlar alınamadı';
-        document.getElementById('testStatus').style.color = '#dc3545';
-        isTestRunning = false;
-        return;
-    }
-    
-    // Tablo satırlarını oluştur
-    tbody.innerHTML = '';
-    let completedCount = 0;
-    data.forEach(r => {
-        const status = r.status || (r.success === true ? 'success' : (r.success === false ? 'fail' : 'queued'));
-        const pending = status === 'queued' || status === 'running';
-        if (!pending) completedCount++;
-        const rowClass = pending ? '' : (status === 'success' ? 'ok' : 'fail');
-        
-        // Mesajı kısalt (çok uzunsa)
-        let message = r.message || '';
-        if (message.length > 80) {
-            message = message.slice(0, 77) + '...';
-        }
-        
-        const statusText = statusLabel(status, message);
-        const row = `<tr class="${rowClass}">
-            <td>${escapeHtml(r.baseUrl)}</td>
-            <td>${escapeHtml(r.username)}</td>
-            <td>${escapeHtml(r.password)}</td>
-            <td>${escapeHtml(statusText)}</td>
-            <td style="max-width: 300px; word-break: break-word; font-size: 12px;">${escapeHtml(message)}</td>
-        </tr>`;
-        tbody.insertAdjacentHTML('beforeend', row);
-    });
-
-    // Durum güncelleme
-    if (isTestRunning) {
-        const statusText = `🔄 Test çalışıyor... (${completedCount}/${totalTests})`;
-        document.getElementById('testStatus').textContent = statusText;
-        document.getElementById('testStatus').style.color = '#2563eb';
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = statusText;
-            checkerStatus.style.color = '#2563eb';
-        }
-    }
-
-    // Test tamamlandı mı?
-    const completed = data.length === totalTests && data.every(item => {
-        const status = item.status || (item.success === true ? 'success' : (item.success === false ? 'fail' : 'queued'));
-        return status !== 'queued' && status !== 'running';
-    });
-    
-    if (totalTests > 0 && completed && !window.popupShown) {
-        window.popupShown = true;
-        isTestRunning = false;
-        
-        // Butonları geri getir
-        document.getElementById('startButton').style.display = 'inline-block';
-        for (const id of ['stopButton', 'stopButtonResults']) {
-            const btn = document.getElementById(id);
-            if (btn) btn.style.display = 'none';
-        }
-        
-        const statusText = `✅ Test tamamlandı (${totalTests} test)`;
-        document.getElementById('testStatus').textContent = statusText;
-        document.getElementById('testStatus').style.color = '#198754';
-        const checkerStatus = document.getElementById('checkerStatus');
-        if (checkerStatus) {
-            checkerStatus.textContent = statusText;
-            checkerStatus.style.color = '#198754';
-        }
-        
-        const okCount = data.filter(x => x.status === 'success' || x.success === true).length;
-        const failCount = data.filter(x => x.status === 'fail' || x.success === false).length;
-        const mfaCount = data.filter(x => x.status === 'mfa_required').length;
-        const cancelledCount = data.filter(x => x.status === 'cancelled').length;
-        const errorCount = data.length - okCount - failCount - mfaCount - cancelledCount;
-        alert(`🏁 TEST TAMAMLANDI!\n✅ Başarılı: ${okCount}\n❌ Başarısız: ${failCount}\n🛡 2FA gerekli: ${mfaCount}\n⏹ İptal edilen: ${cancelledCount}\n⚠ Çalıştırılamadı: ${errorCount}\nRaporu "İNDİR" butonuyla alabilirsiniz.`);
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = null;
-    }
-}
-
 
     async function downloadResults() {
-        if (!currentRunId) {
-            alert('İndirilecek aktif check sonucu yok.');
-            return;
-        }
+        if (!currentRunId) { alert('İndirilecek aktif check sonucu yok.'); return; }
         window.location.href = `/api/download?runId=${encodeURIComponent(currentRunId)}`;
     }
 
+    // ========================================================================
+    //  HISTORY
+    // ========================================================================
     async function loadHistory(type) {
         if (!currentUser) return;
         currentHistoryType = type;
@@ -1598,14 +1400,56 @@ async function refreshResults() {
             throw new Error(err.error || `Geçmiş alınamadı. HTTP ${res.status}`);
         }
         historyRows = await readJson(res, 'Geçmiş okunamadı.');
-        document.getElementById('historyTitle').textContent = type === 'checks'
-            ? '📁 Tüm Check Geçmişi'
-            : '📁 Başarılı Geçmiş';
+        document.getElementById('historyTitle').textContent = type === 'checks' ? '📁 Tüm Check Geçmişi' :
+            '📁 Başarılı Geçmiş';
         document.getElementById('historyChecksBtn').classList.toggle('active', type === 'checks');
         document.getElementById('historySuccessBtn').classList.toggle('active', type === 'successful');
         renderHistory();
     }
 
+    function renderHistory() {
+        const search = document.getElementById('historySearch').value.trim().toLowerCase();
+        const status = document.getElementById('historyStatusFilter').value;
+        const limit = Number(document.getElementById('historyLimitFilter').value || 50);
+        const scopedRows = historyRows.filter(item => {
+            if (status === 'success' && !item.success) return false;
+            if (status === 'fail' && item.success) return false;
+            if (!search) return true;
+            const text = [
+                item.ownerUsername, item.ownerRole, item.domain, item.url,
+                item.username, item.passwordMasked, item.message,
+                item.success ? 'başarılı success ok' : 'başarısız fail hata'
+            ].join(' ').toLowerCase();
+            return text.includes(search);
+        });
+        const data = scopedRows.slice(0, limit);
+        updateHistorySummary(scopedRows);
+        historyBody.innerHTML = '';
+        if (!data.length) { historyBody.innerHTML = '<tr><td colspan="9">Kayıt yok</td></tr>'; return; }
+        data.forEach(item => {
+            const createdAt = item.createdAt || item.checkedAt;
+            const timeText = createdAt ? new Date(createdAt).toLocaleString() : '';
+            const statusClass = item.success ? 'status-ok' : 'status-fail';
+            const statusText = item.success ? 'BAŞARILI' : 'BAŞARISIZ';
+            historyBody.insertAdjacentHTML('beforeend',
+                `<tr class="${item.success ? 'ok' : 'fail'}"><td class="mono">${escapeHtml(timeText)}</td><td>${escapeHtml(item.ownerUsername || currentUser.username)}</td><td>${escapeHtml(item.ownerRole || '')}</td><td>${escapeHtml(item.domain || getDomain(item.url || ''))}</td><td>${escapeHtml(item.url)}</td><td>${escapeHtml(item.username)}</td><td>${escapeHtml(item.passwordMasked)}</td><td><span class="status-pill ${statusClass}">${statusText}</span></td><td>${escapeHtml(item.message || '')}</td></tr>`
+                );
+        });
+    }
+
+    function updateHistorySummary(rows) {
+        const ok = rows.filter(item => item.success).length;
+        const fail = rows.length - ok;
+        const users = new Set(rows.map(item => item.ownerUsername || currentUser.username).filter(Boolean)).size;
+        document.getElementById('historyTotal').textContent = rows.length;
+        document.getElementById('historyOk').textContent = ok;
+        document.getElementById('historyFail').textContent = fail;
+        document.getElementById('historyUsers').textContent = users;
+    }
+
+    // ========================================================================
+    //  SESSION LOGS
+    // ========================================================================
     function sessionEventLabel(event) {
         if (event === 'login_success') return 'GİRİŞ';
         if (event === 'login_failed') return 'HATALI GİRİŞ';
@@ -1623,37 +1467,22 @@ async function refreshResults() {
         }
         const logs = await readJson(res, 'Oturum logları okunamadı.');
         sessionLogsBody.innerHTML = '';
-        if (!logs.length) {
-            sessionLogsBody.innerHTML = '<tr><td colspan="8">Kayıt yok</td></tr>';
-            return;
-        }
+        if (!logs.length) { sessionLogsBody.innerHTML = '<tr><td colspan="8">Kayıt yok</td></tr>'; return; }
         logs.forEach(item => {
-            const row = `<tr class="${item.success ? 'ok' : 'fail'}">
-                <td class="mono">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '')}</td>
-                <td>${escapeHtml(item.username)}</td>
-                <td>${escapeHtml(item.role || '')}</td>
-                <td>${escapeHtml(sessionEventLabel(item.event))}</td>
-                <td>${item.success ? 'BAŞARILI' : 'BAŞARISIZ'}</td>
-                <td>${escapeHtml(item.ip || '')}</td>
-                <td>${escapeHtml(item.reason || '')}</td>
-                <td>${escapeHtml(item.userAgent || '')}</td>
-            </tr>`;
-            sessionLogsBody.insertAdjacentHTML('beforeend', row);
+            sessionLogsBody.insertAdjacentHTML('beforeend',
+                `<tr class="${item.success ? 'ok' : 'fail'}"><td class="mono">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '')}</td><td>${escapeHtml(item.username)}</td><td>${escapeHtml(item.role || '')}</td><td>${escapeHtml(sessionEventLabel(item.event))}</td><td>${item.success ? 'BAŞARILI' : 'BAŞARISIZ'}</td><td>${escapeHtml(item.ip || '')}</td><td>${escapeHtml(item.reason || '')}</td><td>${escapeHtml(item.userAgent || '')}</td></tr>`
+                );
         });
     }
 
+    // ========================================================================
+    //  USER MANAGEMENT
+    // ========================================================================
     function permissionCheckboxes(selected, prefix, disabled = false) {
         const selectedSet = new Set(selected || []);
-        return permissionCatalog.map(permission => `
-            <label class="permission-option">
-                <input type="checkbox"
-                    data-permission="${escapeHtml(permission.key)}"
-                    class="${escapeHtml(prefix)}"
-                    ${selectedSet.has(permission.key) ? 'checked' : ''}
-                    ${disabled ? 'disabled' : ''}>
-                ${escapeHtml(permission.label)}
-            </label>
-        `).join('');
+        return permissionCatalog.map(permission =>
+            `<label class="permission-option"><input type="checkbox" data-permission="${escapeHtml(permission.key)}" class="${escapeHtml(prefix)}" ${selectedSet.has(permission.key) ? 'checked' : ''} ${disabled ? 'disabled' : ''}> ${escapeHtml(permission.label)}</label>`
+        ).join('');
     }
 
     function selectedPermissions(selector) {
@@ -1664,9 +1493,7 @@ async function refreshResults() {
         if (!permissionCatalog.length) return;
         const role = document.getElementById('newUserRole').value;
         document.getElementById('newUserPermissions').innerHTML = permissionCheckboxes(
-            permissionDefaults[role] || [],
-            'new-user-permission',
-            role === 'admin'
+            permissionDefaults[role] || [], 'new-user-permission', role === 'admin'
         );
     }
 
@@ -1674,53 +1501,25 @@ async function refreshResults() {
         if (!hasPermission('users.manage')) return;
         const res = await apiFetch('/api/admin/users');
         const data = await readJson(res, 'Kullanıcılar okunamadı.');
-        if (!res.ok) {
-            showInlineError(data.error || 'Kullanıcılar okunamadı.');
-            return;
-        }
+        if (!res.ok) { showInlineError(data.error || 'Kullanıcılar okunamadı.'); return; }
         permissionCatalog = data.permissionCatalog || [];
         permissionDefaults = data.defaults || { admin: [], user: [] };
         renderCreatePermissions();
         usersBody.innerHTML = '';
-        if (!data.users.length) {
-            usersBody.innerHTML = '<tr><td colspan="6">Kullanıcı yok</td></tr>';
-            return;
-        }
+        if (!data.users.length) { usersBody.innerHTML = '<tr><td colspan="6">Kullanıcı yok</td></tr>'; return; }
         data.users.forEach(user => {
             const isSelf = user.id === currentUser.id;
             const permissionClass = `user-permission-${user.id}`;
-            const row = `<tr>
-                <td>
-                    <b>${escapeHtml(user.username)}</b>
-                    <div class="muted">Son giriş: ${escapeHtml(user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Yok')}</div>
-                </td>
-                <td>
-                    <select id="role-${user.id}" onchange="toggleUserPermissionInputs('${user.id}')">
-                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>Kullanıcı</option>
-                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
-                <td><label class="permission-option"><input id="active-${user.id}" type="checkbox" ${user.active ? 'checked' : ''} ${isSelf ? 'disabled' : ''}> Aktif</label></td>
-                <td class="user-permissions"><div class="permission-grid" id="permissions-${user.id}">${permissionCheckboxes(user.permissions, permissionClass, user.role === 'admin')}</div></td>
-                <td><input id="password-${user.id}" type="password" autocomplete="new-password" placeholder="Değişmeyecek"></td>
-                <td>
-                    <div class="user-actions">
-                        <button onclick="saveUser('${user.id}')">KAYDET</button>
-                        <button class="danger" onclick="deleteUser('${user.id}')" ${isSelf ? 'disabled' : ''}>SİL</button>
-                    </div>
-                </td>
-            </tr>`;
-            usersBody.insertAdjacentHTML('beforeend', row);
+            usersBody.insertAdjacentHTML('beforeend',
+                `<tr><td><b>${escapeHtml(user.username)}</b><div class="muted">Son giriş: ${escapeHtml(user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Yok')}</div></td><td><select id="role-${user.id}" onchange="toggleUserPermissionInputs('${user.id}')"><option value="user" ${user.role === 'user' ? 'selected' : ''}>Kullanıcı</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option></select></td><td><label class="permission-option"><input id="active-${user.id}" type="checkbox" ${user.active ? 'checked' : ''} ${isSelf ? 'disabled' : ''}> Aktif</label></td><td class="user-permissions"><div class="permission-grid" id="permissions-${user.id}">${permissionCheckboxes(user.permissions, permissionClass, user.role === 'admin')}</div></td><td><input id="password-${user.id}" type="password" autocomplete="new-password" placeholder="Değişmeyecek"></td><td><div class="user-actions"><button onclick="saveUser('${user.id}')">KAYDET</button><button class="danger" onclick="deleteUser('${user.id}')" ${isSelf ? 'disabled' : ''}>SİL</button></div></td></tr>`
+                );
         });
     }
 
     function toggleUserPermissionInputs(userId) {
         const role = document.getElementById(`role-${userId}`).value;
         const inputs = document.querySelectorAll(`.user-permission-${userId}`);
-        inputs.forEach(input => {
-            input.disabled = role === 'admin';
-            if (role === 'admin') input.checked = true;
-        });
+        inputs.forEach(input => { input.disabled = role === 'admin'; if (role === 'admin') input.checked = true; });
     }
 
     async function createUser() {
@@ -1730,9 +1529,7 @@ async function refreshResults() {
             password: document.getElementById('newUserPassword').value,
             role,
             active: true,
-            permissions: role === 'admin'
-                ? permissionDefaults.admin
-                : selectedPermissions('.new-user-permission')
+            permissions: role === 'admin' ? permissionDefaults.admin : selectedPermissions('.new-user-permission')
         };
         const res = await apiFetch('/api/admin/users', {
             method: 'POST',
@@ -1741,10 +1538,7 @@ async function refreshResults() {
         });
         const data = await readJson(res, 'Kullanıcı oluşturma cevabı okunamadı.');
         const note = document.getElementById('usersNote');
-        if (!res.ok) {
-            note.textContent = data.error || 'Kullanıcı oluşturulamadı.';
-            return;
-        }
+        if (!res.ok) { note.textContent = data.error || 'Kullanıcı oluşturulamadı.'; return; }
         note.textContent = `${data.user.username} oluşturuldu.`;
         document.getElementById('newUsername').value = '';
         document.getElementById('newUserPassword').value = '';
@@ -1756,9 +1550,8 @@ async function refreshResults() {
         const payload = {
             role,
             active: document.getElementById(`active-${userId}`).checked,
-            permissions: role === 'admin'
-                ? permissionDefaults.admin
-                : selectedPermissions(`.user-permission-${userId}`),
+            permissions: role === 'admin' ? permissionDefaults.admin : selectedPermissions(
+                `.user-permission-${userId}`),
             password: document.getElementById(`password-${userId}`).value
         };
         const res = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
@@ -1767,92 +1560,31 @@ async function refreshResults() {
             body: JSON.stringify(payload)
         });
         const data = await readJson(res, 'Kullanıcı güncelleme cevabı okunamadı.');
-        if (!res.ok) {
-            showInlineError(data.error || 'Kullanıcı güncellenemedi.');
-            return;
-        }
+        if (!res.ok) { showInlineError(data.error || 'Kullanıcı güncellenemedi.'); return; }
         await loadUsers();
-        if (userId === currentUser.id) {
-            currentUser = data.user;
-            showApp(currentUser);
-        }
+        if (userId === currentUser.id) { currentUser = data.user;
+            showApp(currentUser); }
     }
 
     async function deleteUser(userId) {
         if (!confirm('Bu kullanıcı silinsin mi?')) return;
         const res = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
         const data = await readJson(res, 'Kullanıcı silme cevabı okunamadı.');
-        if (!res.ok) {
-            showInlineError(data.error || 'Kullanıcı silinemedi.');
-            return;
-        }
+        if (!res.ok) { showInlineError(data.error || 'Kullanıcı silinemedi.'); return; }
         await loadUsers();
     }
 
-    function renderHistory() {
-        const search = document.getElementById('historySearch').value.trim().toLowerCase();
-        const status = document.getElementById('historyStatusFilter').value;
-        const limit = Number(document.getElementById('historyLimitFilter').value || 50);
-        const scopedRows = historyRows.filter(item => {
-            if (status === 'success' && !item.success) return false;
-            if (status === 'fail' && item.success) return false;
-            if (!search) return true;
-            const text = [
-                item.ownerUsername,
-                item.ownerRole,
-                item.domain,
-                item.url,
-                item.username,
-                item.passwordMasked,
-                item.message,
-                item.success ? 'başarılı success ok' : 'başarısız fail hata'
-            ].join(' ').toLowerCase();
-            return text.includes(search);
-        });
-        const data = scopedRows.slice(0, limit);
-
-        updateHistorySummary(scopedRows);
-        historyBody.innerHTML = '';
-        if (!data.length) {
-            historyBody.innerHTML = '<tr><td colspan="9">Kayıt yok</td></tr>';
-            return;
-        }
-        data.forEach(item => {
-            const createdAt = item.createdAt || item.checkedAt;
-            const timeText = createdAt ? new Date(createdAt).toLocaleString() : '';
-            const statusClass = item.success ? 'status-ok' : 'status-fail';
-            const statusText = item.success ? 'BAŞARILI' : 'BAŞARISIZ';
-            const row = `<tr class="${item.success ? 'ok' : 'fail'}">
-                <td class="mono">${escapeHtml(timeText)}</td>
-                <td>${escapeHtml(item.ownerUsername || currentUser.username)}</td>
-                <td>${escapeHtml(item.ownerRole || '')}</td>
-                <td>${escapeHtml(item.domain || getDomain(item.url || ''))}</td>
-                <td>${escapeHtml(item.url)}</td>
-                <td>${escapeHtml(item.username)}</td>
-                <td>${escapeHtml(item.passwordMasked)}</td>
-                <td><span class="status-pill ${statusClass}">${statusText}</span></td>
-                <td>${escapeHtml(item.message || '')}</td>
-            </tr>`;
-            historyBody.insertAdjacentHTML('beforeend', row);
-        });
-    }
-
-    function updateHistorySummary(rows) {
-        const ok = rows.filter(item => item.success).length;
-        const fail = rows.length - ok;
-        const users = new Set(rows.map(item => item.ownerUsername || currentUser.username).filter(Boolean)).size;
-        document.getElementById('historyTotal').textContent = rows.length;
-        document.getElementById('historyOk').textContent = ok;
-        document.getElementById('historyFail').textContent = fail;
-        document.getElementById('historyUsers').textContent = users;
-    }
-
+    // ========================================================================
+    //  INIT
+    // ========================================================================
     window.onload = async () => {
         document.getElementById('proxyInput').addEventListener('keydown', event => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                addProxy();
-            }
+            if (event.key === 'Enter') { event.preventDefault();
+                addProxy(); }
+        });
+        document.getElementById('baseUrlInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter') { event.preventDefault();
+                formatWithBaseUrl(); }
         });
         await checkSession();
     };
