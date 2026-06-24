@@ -3,7 +3,7 @@ services:
     name: loginpanelcheckers
     runtime: node
     plan: starter
-    buildCommand: npm ci && npx puppeteer browsers install chrome
+    buildCommand: npm ci && PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer npx puppeteer browsers install chrome
     preDeployCommand: npm run migrate
     startCommand: npm start
     healthCheckPath: /health
@@ -13,7 +13,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
+        value: /opt/render/project/src/.cache/puppeteer
       - key: BROWSER_HEADLESS
         value: "1"
       - key: SESSION_SECRET

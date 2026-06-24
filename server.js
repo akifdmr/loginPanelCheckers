@@ -8,7 +8,8 @@ const crypto = require('crypto');
 const https = require('https');
 const net = require('net');
 
-process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR || path.join(__dirname, '.cache', 'puppeteer');
+process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR
+    || (process.env.RENDER ? '/opt/render/project/src/.cache/puppeteer' : path.join(__dirname, '.cache', 'puppeteer'));
 
 const puppeteer = require('puppeteer');
 const { MongoClient, ObjectId } = require('mongodb');
