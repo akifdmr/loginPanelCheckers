@@ -80,6 +80,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let clients = [];
 let db = null;
+let mongoClient = null;
 let mongoStatus = { configured: false, attempted: false, connected: false, error: null };
 
 // ==================== CACHE ====================
@@ -256,7 +257,8 @@ function getSessionUser(req) {
 async function requireAuth(req, res, next) {
     try {
         const session = getSessionUser(req);
-        if (!session || !db || !ObjectId.isValid(session.id)) {
+        const mongoReady = await ensureMongoReady();
+        if (!session || !mongoReady || !ObjectId.isValid(session.id)) {
             return res.status(401).json({ error: 'Giriş gerekli.' });
         }
         const user = await db.collection('users').findOne({ _id: new ObjectId(session.id) });
@@ -1388,6 +1390,10 @@ async function connectMongo() {
         console.log(`MongoDB bağlantısı başlatılıyor... env=${mongoConfig.source} db=${mongoConfig.dbName} auth=${mongoConfig.authMode}`);
         const client = new MongoClient(mongoConfig.uri, mongoConfig.clientOptions);
         await client.connect();
+        if (mongoClient) {
+            await mongoClient.close().catch(() => {});
+        }
+        mongoClient = client;
         db = client.db(mongoConfig.dbName);
         await db.command({ ping: 1 });
         mongoStatus.connected = true;
@@ -1403,12 +1409,41 @@ async function connectMongo() {
         return client;
     } catch (err) {
         console.error('❌ MongoDB bağlantı hatası:', err.message);
+        if (mongoClient) {
+            await mongoClient.close().catch(() => {});
+        }
+        mongoClient = null;
         db = null;
         mongoStatus.configured = !err.message.includes('connection string missing');
         mongoStatus.attempted = mongoStatus.configured;
         mongoStatus.connected = false;
         mongoStatus.error = err.message;
         return null;
+    }
+}
+
+async function ensureMongoReady() {
+    if (!db) {
+        await connectMongo();
+    }
+    if (!db) return false;
+
+    try {
+        await db.command({ ping: 1 });
+        mongoStatus.connected = true;
+        mongoStatus.error = null;
+        return true;
+    } catch (err) {
+        console.error('❌ MongoDB ping hatası:', err.message);
+        mongoStatus.connected = false;
+        mongoStatus.error = err.message;
+        if (mongoClient) {
+            await mongoClient.close().catch(() => {});
+        }
+        mongoClient = null;
+        db = null;
+        await connectMongo();
+        return Boolean(db && mongoStatus.connected);
     }
 }
 
@@ -1730,7 +1765,8 @@ async function runAllTests(testItems, owner, runId) {
 // Auth
 app.post('/api/auth/login', async (req, res) => {
     try {
-        if (!db) return res.status(503).json({ error: 'DB bağlantısı yok' });
+        const mongoReady = await ensureMongoReady();
+        if (!mongoReady) return res.status(503).json({ error: 'DB bağlantısı yok' });
         const username = normalizeUsername(req.body?.username);
         const password = String(req.body?.password || '');
         if (!username || !password) {
@@ -2326,8 +2362,8 @@ app.post('/api/group-download', requireAuth, requirePermission(PERMISSIONS.LISTS
 });
 
 // ==================== HEALTH ====================
-app.get('/health', (req, res) => {
-    const healthy = Boolean(db && mongoStatus.connected);
+app.get('/health', async (req, res) => {
+    const healthy = await ensureMongoReady();
     res.status(healthy ? 200 : 503).json({
         ok: healthy,
         service: 'panelcheckers',
