@@ -1,9 +1,9 @@
 const MONGO_URI_ENV_KEYS = [
-    'DATABASE_URL',
     'MONGODB_URI',
     'MONGODB_CONNECTIONSTRING',
     'MONGO_URL',
-    'MONGODB_URL'
+    'MONGODB_URL',
+    'DATABASE_URL'
 ];
 
 function cleanEnvValue(value) {
@@ -17,7 +17,7 @@ function getMongoConfig(env = process.env) {
     const source = MONGO_URI_ENV_KEYS.find(key => cleanEnvValue(env[key]));
     const uri = source ? cleanEnvValue(env[source]) : '';
     const username = cleanEnvValue(env.MONGODB_USERNAME);
-    const password = cleanEnvValue(env.MONGODB_PASSWORD);
+    const password = cleanEnvValue(env.MONGODB_PASSWORD || env.MONGODB_PASS);
     const configuredDbName = cleanEnvValue(env.MONGODB_DB_NAME || env.MONGODB_NAME || env.DB_NAME);
 
     if (!uri) {

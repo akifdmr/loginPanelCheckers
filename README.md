@@ -12,6 +12,8 @@ MONGODB_PASSWORD=...
 MONGODB_DB_NAME=mydb
 ```
 
+Remove any stale `DATABASE_URL` value from Render. If it must remain for another integration, `MONGODB_URI` now takes precedence in this app.
+
 Elasticsearch remains available by setting:
 
 ```env
