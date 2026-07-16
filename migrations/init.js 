@@ -1,0 +1,133 @@
+// migrations/init.js
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
+
+const uri = process.env.MONGODB_CONNECTIONSTRING;
+const client = new MongoClient(uri);
+
+async function migrate() {
+    try {
+        await client.connect();
+        const db = client.db();
+        
+        console.log('📦 Migration başlatılıyor...');
+
+        // ==================== 1. Sistem Ayarları ====================
+        const settings = db.collection('settings');
+        
+        // Varsayılan ayarlar
+        const defaultSettings = {
+            _id: 'system',
+            allowedHosts: ['localhost', '127.0.0.1'],
+            rootDomains: [],
+            enforceRootDomains: false,
+            proxyConfigs: [
+                {
+                    id: 'usa',
+                    label: '🇺🇸 USA Proxy',
+                    host: '',
+                    port: 1080,
+                    username: '',
+                    password: '',
+                    expectedCountry: 'US',
+                    enabled: false
+                },
+                {
+                    id: 'germany',
+                    label: '🇩🇪 Germany Proxy',
+                    host: '',
+                    port: 1080,
+                    username: '',
+                    password: '',
+                    expectedCountry: 'DE',
+                    enabled: false
+                },
+                {
+                    id: 'netherlands',
+                    label: '🇳🇱 Netherlands Proxy',
+                    host: '',
+                    port: 1080,
+                    username: '',
+                    password: '',
+                    expectedCountry: 'NL',
+                    enabled: false
+                },
+                {
+                    id: 'asia',
+                    label: '🌏 Asia Proxy',
+                    host: '',
+                    port: 1080,
+                    username: '',
+                    password: '',
+                    expectedCountry: '',
+                    enabled: false
+                }
+            ],
+            updatedAt: new Date()
+        };
+
+        await settings.updateOne(
+            { _id: 'system' },
+            { $set: defaultSettings },
+            { upsert: true }
+        );
+        console.log('✅ Sistem ayarları eklendi');
+
+        // ==================== 2. Admin Kullanıcı ====================
+        const users = db.collection('users');
+        const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+        const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+        const existingAdmin = await users.findOne({ username: adminUsername });
+        if (!existingAdmin) {
+            const crypto = require('crypto');
+            function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+                const hash = crypto.pbkdf2Sync(String(password), salt, 120000, 32, 'sha256').toString('hex');
+                return `${salt}:${hash}`;
+            }
+
+            await users.insertOne({
+                username: adminUsername,
+                passwordHash: hashPassword(adminPassword),
+                role: 'admin',
+                permissions: [
+                    'checker.run',
+                    'checker.results',
+                    'proxy.manage',
+                    'lists.group',
+                    'history.own',
+                    'history.all',
+                    'users.manage',
+                    'hosts.manage',
+                    'sessions.view'
+                ],
+                active: true,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+            console.log(`✅ Admin kullanıcı oluşturuldu: ${adminUsername}`);
+        } else {
+            console.log(`✅ Admin kullanıcı zaten var: ${adminUsername}`);
+        }
+
+        // ==================== 3. İndeksler ====================
+        await users.createIndex({ username: 1 }, { unique: true });
+        await db.collection('check_results').createIndex({ ownerUserId: 1, createdAt: -1 });
+        await db.collection('successful_logins').createIndex({ ownerUserId: 1, createdAt: -1 });
+        await db.collection('session_logs').createIndex({ createdAt: -1 });
+        await db.collection('session_logs').createIndex({ username: 1, createdAt: -1 });
+        await db.collection('user_audit_logs').createIndex({ createdAt: -1 });
+        await db.collection('settings').createIndex({ _id: 1 });
+        
+        console.log('✅ İndeksler oluşturuldu');
+        console.log('🎉 Migration tamamlandı!');
+
+    } catch (error) {
+        console.error('❌ Migration hatası:', error);
+        process.exit(1);
+    } finally {
+        await client.close();
+    }
+}
+
+migrate();
