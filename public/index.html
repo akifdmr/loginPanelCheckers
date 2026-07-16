@@ -30,6 +30,9 @@
         button.danger { background: #7d2d2d; }
         button.danger:hover { background: #561b1b; }
         button.active { background: #111827; }
+        button:disabled { opacity: .7; cursor: not-allowed; }
+        .button-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 7px; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; vertical-align: -2px; animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         input, select { width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #cfd8e5; font-size: 14px; background: white; }
         input:focus, select:focus, textarea:focus { outline: 3px solid rgba(37, 99, 235, .12); border-color: #80a7f8; }
         .hidden { display: none !important; }
@@ -1077,11 +1080,14 @@
     // ========================================================================
     //  TEMİZLE
     // ========================================================================
-    async function clearAll() {
+    async function clearAll(options = {}) {
+        const { clearInput = true } = options;
         tbody.innerHTML = '';
         logPanel.innerHTML = '<div>🧹 Temizlendi - Yeni teste hazır</div>';
-        const creds = document.getElementById('creds');
-        if (creds) creds.value = '';
+        if (clearInput) {
+            const creds = document.getElementById('creds');
+            if (creds) creds.value = '';
+        }
         const inventoryPanel = document.getElementById('inventoryPanel');
         if (inventoryPanel) inventoryPanel.classList.add('hidden');
         const inventoryBody = document.getElementById('inventoryBody');
@@ -1306,12 +1312,33 @@
     // ========================================================================
     //  START / STOP TEST
     // ========================================================================
+    function setStartLoading(isLoading, text = '') {
+        const button = document.getElementById('startButton');
+        if (!button) return;
+        if (isLoading) {
+            button.disabled = true;
+            button.innerHTML = `<span class="button-spinner"></span>${escapeHtml(text || 'BAŞLATILIYOR...')}`;
+            button.style.display = 'inline-block';
+            return;
+        }
+        button.disabled = false;
+        button.textContent = '▶ BAŞLAT';
+        button.style.display = hasPermission('checker.run') ? 'inline-block' : 'none';
+    }
+
     async function startTest() {
         try {
             const creds = document.getElementById('creds').value;
             if (!creds.trim()) { alert('Lütfen URL:Kullanıcı:Şifre listesini doldurun.'); return; }
 
-            await clearAll();
+            setStartLoading(true);
+            const checkerStatus = document.getElementById('checkerStatus');
+            if (checkerStatus) {
+                checkerStatus.textContent = '⏳ Test başlatılıyor...';
+                checkerStatus.style.color = '#2563eb';
+            }
+            await clearAll({ clearInput: false });
+            setStartLoading(true);
 
             const res = await apiFetch('/api/start', {
                 method: 'POST',
@@ -1319,21 +1346,29 @@
                 body: JSON.stringify({ credsText: creds })
             });
             const json = await readJson(res, 'Test başlatma cevabı okunamadı.');
-            if (!res.ok) { alert('Hata: ' + (json.error || 'Bilinmeyen hata')); return; }
+            if (!res.ok) {
+                setStartLoading(false);
+                alert('Hata: ' + (json.error || 'Bilinmeyen hata'));
+                return;
+            }
 
             totalTests = json.total;
             currentRunId = json.runId;
             isTestRunning = true;
             window.popupShown = false;
 
-            document.getElementById('startButton').style.display = 'none';
+            const startButton = document.getElementById('startButton');
+            if (startButton) {
+                startButton.disabled = false;
+                startButton.textContent = '▶ BAŞLAT';
+                startButton.style.display = 'none';
+            }
             const stopBtn = document.getElementById('stopButton');
             if (stopBtn) stopBtn.style.display = 'inline-block';
             const stopBtnResults = document.getElementById('stopButtonResults');
             if (stopBtnResults) stopBtnResults.style.display = 'inline-block';
 
             const statusText = `🔄 Test çalışıyor... (0/${totalTests})`;
-            const checkerStatus = document.getElementById('checkerStatus');
             if (checkerStatus) { checkerStatus.textContent = statusText;
                 checkerStatus.style.color = '#2563eb'; }
             document.getElementById('testStatus').textContent = statusText;
@@ -1348,7 +1383,7 @@
         } catch (err) {
             alert('Hata: ' + err.message);
             showInlineError(err.message);
-            document.getElementById('startButton').style.display = 'inline-block';
+            setStartLoading(false);
             ['stopButton', 'stopButtonResults'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.style.display = 'none';

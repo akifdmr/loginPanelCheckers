@@ -326,23 +326,29 @@ function getDomainFromUrl(value) {
 }
 
 async function isAllowedCheckUrl(value) {
+    return (await getAllowedCheckDecision(value)).ok;
+}
+
+async function getAllowedCheckDecision(value) {
     try {
         const url = new URL(normalizeUrl(value));
         const host = normalizeHost(url.hostname);
         const hosts = await getAllowedHosts();
+        const rootDomains = await getRootDomains();
         
-        // Ana domain kontrolü (alt domainleri de kontrol et)
-        const isAllowed = hosts.some(allowedHost => {
+        const matchedHost = hosts.find(allowedHost => {
             if (host === allowedHost) return true;
             if (host.endsWith(`.${allowedHost}`)) return true;
             return false;
         });
+        const matchedRoot = rootDomains.find(root => isHostUnderRoot(host, root));
+        const isAllowed = Boolean(matchedHost || matchedRoot);
         
-        console.log(`🔍 Host kontrol: ${host} -> İzinli mi? ${isAllowed} (${hosts.join(', ')})`);
+        console.log(`🔍 Host kontrol: ${host} -> İzinli mi? ${isAllowed} (hosts=${hosts.join(', ')} roots=${rootDomains.join(', ')})`);
         
-        return isAllowed;
-    } catch {
-        return false;
+        return { ok: isAllowed, host, matchedHost: matchedHost || null, matchedRoot: matchedRoot || null, allowedHosts: hosts, rootDomains };
+    } catch (err) {
+        return { ok: false, host: '', error: err.message, allowedHosts: [], rootDomains: [] };
     }
 }
 
@@ -2412,17 +2418,19 @@ app.post('/api/start', requireAuth, requirePermission(PERMISSIONS.CHECKER_RUN), 
         const hosts = await getAllowedHosts();
         const blockedHosts = [];
         for (const item of testItems) {
-            if (!(await isAllowedCheckUrl(item.baseUrl))) {
-                try { blockedHosts.push(new URL(normalizeUrl(item.baseUrl)).hostname.toLowerCase()); }
-                catch { blockedHosts.push(item.baseUrl); }
+            const decision = await getAllowedCheckDecision(item.baseUrl);
+            if (!decision.ok) {
+                blockedHosts.push(decision.host || item.baseUrl);
             }
         }
         const uniqueBlockedHosts = [...new Set(blockedHosts)];
 
         if (uniqueBlockedHosts.length > 0) {
+            const rootDomains = await getRootDomains();
             return res.status(400).json({
                 error: `İzinli olmayan host: ${uniqueBlockedHosts.join(', ')}`,
-                allowedHosts: hosts
+                allowedHosts: hosts,
+                rootDomains
             });
         }
 
