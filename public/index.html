@@ -866,6 +866,12 @@
             const err = await readJson(res, 'ZIP hata cevabı okunamadı.').catch(() => ({}));
             throw new Error(err.error || 'ZIP indirilemedi');
         }
+        let domainSync = null;
+        const syncHeader = res.headers.get('X-Group-Domain-Sync');
+        if (syncHeader) {
+            try { domainSync = JSON.parse(decodeURIComponent(syncHeader)); }
+            catch { domainSync = null; }
+        }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -875,6 +881,7 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+        return domainSync;
     }
 
     function downloadTextFile(filename, content) {
@@ -896,8 +903,14 @@
         const groupedText = buildGroupedText(items);
         document.getElementById('creds').value = groupedText;
         try {
-            await downloadGroupedZip(groups);
-            alert(`${groups.length} domain için liste gruplandı ve ZIP olarak indirildi.`);
+            const domainSync = await downloadGroupedZip(groups);
+            const syncMessage = domainSync && domainSync.canPersistDomains ?
+                ` Yetkili domainlere ${domainSync.added.length} yeni domain eklendi, ${domainSync.existing.length} domain zaten vardı.` :
+                ' Yetkili domain kaydı yapılmadı; bunun için Yetkili domain yönetimi yetkisi gerekir.';
+            alert(`${groups.length} domain için liste gruplandı ve ZIP olarak indirildi.${syncMessage}`);
+            if (domainSync && domainSync.canPersistDomains && hasPermission('hosts.manage')) {
+                loadAllowedHosts().catch(err => showInlineError(err.message));
+            }
         } catch (err) {
             downloadTextFile('domain-bazli-liste.txt', groupedText);
             alert(`ZIP indirilemedi, gruplu TXT indirildi: ${err.message}`);
@@ -1067,8 +1080,14 @@
     async function clearAll() {
         tbody.innerHTML = '';
         logPanel.innerHTML = '<div>🧹 Temizlendi - Yeni teste hazır</div>';
+        const creds = document.getElementById('creds');
+        if (creds) creds.value = '';
         const inventoryPanel = document.getElementById('inventoryPanel');
         if (inventoryPanel) inventoryPanel.classList.add('hidden');
+        const inventoryBody = document.getElementById('inventoryBody');
+        if (inventoryBody) inventoryBody.innerHTML = '';
+        const inventorySummary = document.getElementById('inventorySummary');
+        if (inventorySummary) inventorySummary.innerHTML = '';
         if (isTestRunning && currentRunId) {
             try { await apiFetch(`/api/stop?runId=${encodeURIComponent(currentRunId)}`, { method: 'POST' }); } catch (
                 e) { console.warn('Durdurma hatası:', e); }
@@ -1088,13 +1107,19 @@
         currentRunId = null;
         window.popupShown = false;
         isTestRunning = false;
-        document.getElementById('startButton').style.display = 'inline-block';
+        const startButton = document.getElementById('startButton');
+        if (startButton) {
+            startButton.style.display = hasPermission('checker.run') ? 'inline-block' : 'none';
+        }
         ['stopButton', 'stopButtonResults'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) btn.style.display = 'none';
         });
-        document.getElementById('testStatus').textContent = '⏸ Bekleniyor...';
-        document.getElementById('testStatus').style.color = '#667085';
+        const testStatus = document.getElementById('testStatus');
+        if (testStatus) {
+            testStatus.textContent = '⏸ Bekleniyor...';
+            testStatus.style.color = '#667085';
+        }
         const checkerStatus = document.getElementById('checkerStatus');
         if (checkerStatus) { checkerStatus.textContent = '🧹 Temizlendi';
             checkerStatus.style.color = '#667085'; }

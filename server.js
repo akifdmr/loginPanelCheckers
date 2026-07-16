@@ -1671,6 +1671,44 @@ async function saveUserAuditLog(req, action, target, changes = {}) {
     });
 }
 
+async function addAllowedHostsFromDomains(domains, actorUsername = '') {
+    if (!db || !Array.isArray(domains) || domains.length === 0) {
+        return { added: [], existing: [], skipped: [] };
+    }
+
+    const settings = await getSettings();
+    const currentHosts = settings?.allowedHosts || [];
+    const added = [], existing = [], skipped = [], seen = new Set();
+
+    for (const domain of domains) {
+        const validation = await validateAllowedHostCandidate(domain);
+        if (!validation.ok) {
+            skipped.push({ input: domain, error: validation.error });
+            continue;
+        }
+        const host = validation.host;
+        if (seen.has(host)) continue;
+        seen.add(host);
+        if (currentHosts.includes(host)) {
+            existing.push(host);
+            continue;
+        }
+        added.push(host);
+    }
+
+    if (added.length > 0) {
+        await db.collection('settings').updateOne(
+            { _id: 'system' },
+            { $set: { allowedHosts: [...currentHosts, ...added], updatedAt: new Date(), updatedBy: actorUsername } },
+            { upsert: true }
+        );
+        cachedSettings = null;
+        settingsCacheTime = 0;
+    }
+
+    return { added, existing, skipped };
+}
+
 async function connectDatabase() {
     try {
         const configuredProvider = getDbProvider();
@@ -2851,6 +2889,12 @@ app.post('/api/group-download', requireAuth, requirePermission(PERMISSIONS.LISTS
             return res.status(400).json({ error: 'Gruplar boş' });
         }
 
+        const domainList = groups.map(group => group.domain).filter(Boolean);
+        const canPersistDomains = req.user.permissions.includes(PERMISSIONS.HOSTS_MANAGE);
+        const hostSync = canPersistDomains
+            ? await addAllowedHostsFromDomains(domainList, req.user.username)
+            : { added: [], existing: [], skipped: [], skippedReason: 'hosts.manage yetkisi yok' };
+
         const zip = new JSZip();
         for (const group of groups) {
             const content = group.lines.join('\n');
@@ -2861,6 +2905,13 @@ app.post('/api/group-download', requireAuth, requirePermission(PERMISSIONS.LISTS
         const buffer = await zip.generateAsync({ type: 'nodebuffer' });
         res.setHeader('Content-Disposition', 'attachment; filename=domain-bazli-listeler.zip');
         res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('X-Group-Domain-Sync', encodeURIComponent(JSON.stringify({
+            canPersistDomains,
+            added: hostSync.added,
+            existing: hostSync.existing,
+            skipped: hostSync.skipped,
+            skippedReason: hostSync.skippedReason || ''
+        })));
         res.send(buffer);
     } catch (err) {
         res.status(500).json({ error: err.message });
