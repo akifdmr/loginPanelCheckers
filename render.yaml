@@ -3,7 +3,10 @@ services:
     name: loginpanelcheckers
     runtime: node
     plan: starter
-    buildCommand: npm ci && PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer npx puppeteer browsers install chrome
+    buildCommand: |
+      npm ci
+      export PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer
+      npx @puppeteer/browsers install chrome@stable
     preDeployCommand: npm run migrate
     startCommand: npm start
     healthCheckPath: /health
@@ -18,7 +21,13 @@ services:
         value: "1"
       - key: SESSION_SECRET
         generateValue: true
-      - key: DATABASE_URL
+      - key: DB_PROVIDER
+        value: mongodb
+      - key: MONGODB_URI
+        value: mongodb+srv://paymentmanger.gvaavzc.mongodb.net/?retryWrites=true&w=majority&authSource=admin&appName=paymentmanger
+      - key: MONGODB_USERNAME
+        sync: false
+      - key: MONGODB_PASSWORD
         sync: false
       - key: MONGODB_DB_NAME
-        value: cloverapp
+        value: mydb

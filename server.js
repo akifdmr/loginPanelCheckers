@@ -19,6 +19,8 @@ const JSZip = require('jszip');
 const ProxyChain = require('proxy-chain');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { ensureMongoIndexes, getMongoConfig } = require('./mongo-config');
+const { getDatabaseConfig, getDbProvider } = require('./db-config');
+const { ElasticDatabase } = require('./elastic-db');
 
 // ========== PROXY POOL ==========
 const ProxyPool = require('./proxy-pool');
@@ -27,17 +29,23 @@ const defaultProxyConfig = require('./proxy-config');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || 'localhost';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const CHECK_PROGRESS_DELAY_MS = Number(process.env.CHECK_PROGRESS_DELAY_MS || 1000);
 const CHECK_ATTEMPT_DELAY_MS = Number(process.env.CHECK_ATTEMPT_DELAY_MS || 2000);
 const CHECK_NAVIGATION_TIMEOUT_MS = Number(process.env.CHECK_NAVIGATION_TIMEOUT_MS || 60000);
 const CHECK_POST_SUBMIT_WAIT_MS = Number(process.env.CHECK_POST_SUBMIT_WAIT_MS || 8000);
+const configuredRepeatCount = Number(process.env.CHECK_REPEAT_COUNT || 2);
+const CHECK_REPEAT_COUNT = Number.isFinite(configuredRepeatCount)
+    ? Math.max(1, Math.min(3, Math.floor(configuredRepeatCount)))
+    : 2;
 const PROXY_CHECK_TIMEOUT_MS = Number(process.env.PROXY_CHECK_TIMEOUT_MS || 12000);
 
 const RESULTS_FILE = process.env.RESULTS_FILE || path.join(os.tmpdir(), 'panelcheckers-results.json');
 const SESSION_COOKIE = 'panelcheckers_session';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'panelcheckers-dev-secret-change-me';
+
+app.set('trust proxy', 1);
 
 // ==================== PERMISSIONS ====================
 const PERMISSIONS = Object.freeze({
@@ -83,8 +91,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let clients = [];
 let db = null;
+let dbClient = null;
+let dbStatus = { provider: null, configured: false, attempted: false, connected: false, error: null };
 let mongoClient = null;
-let mongoStatus = { configured: false, attempted: false, connected: false, error: null };
+let mongoStatus = dbStatus;
 
 // ==================== CACHE ====================
 let cachedSettings = null;
@@ -255,6 +265,14 @@ function getSessionUser(req) {
     } catch {
         return null;
     }
+}
+
+function shouldUseSecureCookie(req) {
+    if (!IS_PRODUCTION) return false;
+    const hostname = String(req.hostname || '').toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    return req.secure || forwardedProto === 'https' || Boolean(process.env.RENDER);
 }
 
 async function requireAuth(req, res, next) {
@@ -516,14 +534,51 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
         userDataDir,
         args
     };
-    const configuredExecutablePath = String(process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
-    const macChromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    if (configuredExecutablePath) {
-        launchOptions.executablePath = configuredExecutablePath;
-    } else if (!IS_PRODUCTION && fsSync.existsSync(macChromePath)) {
-        launchOptions.executablePath = macChromePath;
+
+    // 1. Eğer PUPPETEER_EXECUTABLE_PATH ortam değişkeni varsa onu kullan
+    const configuredPath = String(process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
+    if (configuredPath) {
+        launchOptions.executablePath = configuredPath;
+        return launchOptions;
     }
 
+    // 2. Geliştirme ortamında yerel Chrome'u dene (Mac için)
+    const macChromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    if (!IS_PRODUCTION && fsSync.existsSync(macChromePath)) {
+        launchOptions.executablePath = macChromePath;
+        return launchOptions;
+    }
+
+    // 3. Puppeteer'ın kendi executablePath()'sini kullan (cache'deki Chrome)
+    try {
+        const defaultPath = puppeteer.executablePath();
+        if (defaultPath && fsSync.existsSync(defaultPath)) {
+            launchOptions.executablePath = defaultPath;
+            console.log(`✅ Chrome bulundu: ${defaultPath}`);
+            return launchOptions;
+        }
+    } catch (err) {
+        console.warn('⚠ puppeteer.executablePath() hatası:', err.message);
+    }
+
+    // 4. Son çare: PUPPETEER_CACHE_DIR altındaki chrome'u manuel ara
+    const cacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(__dirname, '.cache', 'puppeteer');
+    const possiblePaths = [
+        path.join(cacheDir, 'chrome', 'mac_arm-150.0.7871.24', 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        path.join(cacheDir, 'chrome', 'mac-150.0.7871.24', 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        path.join(cacheDir, 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
+        // varsayılan puppeteer cache yapısı
+        path.join(cacheDir, 'chrome', 'stable', 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+    ];
+    for (const p of possiblePaths) {
+        if (fsSync.existsSync(p)) {
+            launchOptions.executablePath = p;
+            console.log(`✅ Chrome bulundu (manuel): ${p}`);
+            return launchOptions;
+        }
+    }
+
+    console.warn('⚠ Chrome bulunamadı, Puppeteer varsayılan davranışı kullanacak.');
     return launchOptions;
 }
 
@@ -546,6 +601,50 @@ function normalizeUrl(url) {
     if (url.startsWith('//')) url = 'https:' + url;
     if (!url.startsWith('http')) url = 'https://' + url;
     return url;
+}
+
+function createAttemptCookies(runId, index, username) {
+    const traceId = crypto.createHash('sha256')
+        .update(`${runId}:${index}:${username}:${Date.now()}:${crypto.randomUUID()}`)
+        .digest('hex')
+        .slice(0, 24);
+    return [
+        {
+            name: 'lpc_trace',
+            value: traceId,
+            path: '/',
+            sameSite: 'Lax'
+        },
+        {
+            name: 'lpc_attempt',
+            value: Buffer.from(JSON.stringify({ runId: safeFileToken(runId), index, traceId })).toString('base64url'),
+            path: '/',
+            sameSite: 'Lax'
+        }
+    ];
+}
+
+async function setSyntheticAttemptCookies(page, url, runId, index, username) {
+    const parsed = new URL(url);
+    const secure = parsed.protocol === 'https:';
+    const expires = Math.floor(Date.now() / 1000) + 900;
+    const cookies = createAttemptCookies(runId, index, username).map(cookie => ({
+        ...cookie,
+        url,
+        secure,
+        expires
+    }));
+    await page.setCookie(...cookies);
+    return cookies.map(cookie => cookie.name);
+}
+
+async function readCookieNames(page) {
+    try {
+        const cookies = await page.cookies();
+        return cookies.map(cookie => cookie.name).sort();
+    } catch {
+        return [];
+    }
 }
 
 // ==================== EVRENSEL FORM HANDLER ====================
@@ -660,7 +759,6 @@ class UniversalFormHandler {
             
             // Şifre inputunu bul (sayfa değişmiş olabilir)
             let passInput = inputs.pass;
-            const passInputExists = await this.page.$(input => input.type === 'password');
             if (!passInput || !(await this.page.evaluate(el => el.isConnected, passInput).catch(() => false))) {
                 passInput = await this.page.$('input[type="password"], input[data-testid="password-input"]');
             }
@@ -738,19 +836,22 @@ class UniversalFormHandler {
     }
 
     async fillInput(input, value) {
-        await this.page.evaluate((el, val) => {
+        await this.page.evaluate((el) => {
             el.focus();
-            el.value = val;
+            el.value = '';
             const event = new Event('input', { bubbles: true });
             el.dispatchEvent(event);
             const changeEvent = new Event('change', { bubbles: true });
             el.dispatchEvent(changeEvent);
-            el.blur();
-        }, input, String(value));
-        
+        }, input);
+
         await input.click({ clickCount: 3 });
         await input.press('Backspace');
         await input.type(String(value), { delay: 20 });
+        await this.page.evaluate((el) => {
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, input);
     }
 
     // ========== DİĞER FORM BULMA METODLARI ==========
@@ -1052,9 +1153,10 @@ class UniversalFormHandler {
 
 
 // ==================== VERIFY LOGIN SUCCESS (GÜNCELLENMİŞ - DETAYLI HATA) ====================
-async function verifyLoginSuccess(page, originalUrl) {
+async function verifyLoginSuccess(page, originalUrl, originalCookieNames = []) {
     const currentUrl = page.url();
     const urlChanged = currentUrl !== originalUrl;
+    const title = await page.title().catch(() => '');
     
     // ========== BOOKING.COM ÖZEL KONTROL ==========
     if (currentUrl.includes('booking.com')) {
@@ -1184,10 +1286,202 @@ async function verifyLoginSuccess(page, originalUrl) {
         }
     }
     
-    // ========== GENEL KONTROL (MEVCUT) ==========
-    // ... mevcut kod devam eder ...
-    
-    return { success: false, reason: 'Başarılı giriş doğrulanamadı', errorMessage: null };
+    // ========== GENEL KONTROL ==========
+    const genericCheck = await page.evaluate(() => {
+        const visibleText = (element) => {
+            if (!element) return '';
+            const style = window.getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return '';
+            return (element.innerText || element.textContent || '').trim();
+        };
+
+        const errorSelectors = [
+            '[role="alert"]',
+            '[aria-live="assertive"]',
+            '.error',
+            '.error-message',
+            '.alert',
+            '.alert-danger',
+            '.alert-error',
+            '.invalid-feedback',
+            '.validation-summary-errors',
+            '[class*="error"]',
+            '[class*="Error"]'
+        ];
+        const errorMessages = [];
+        for (const selector of errorSelectors) {
+            for (const element of document.querySelectorAll(selector)) {
+                const text = visibleText(element);
+                if (text) errorMessages.push(text);
+            }
+        }
+
+        const successSelectors = [
+            '.success',
+            '.success-message',
+            '.alert-success',
+            '.valid-feedback',
+            '[class*="success"]',
+            '[class*="Success"]'
+        ];
+        const successMessages = [];
+        for (const selector of successSelectors) {
+            for (const element of document.querySelectorAll(selector)) {
+                const text = visibleText(element);
+                if (text) successMessages.push(text);
+            }
+        }
+
+        const passwordInputs = [...document.querySelectorAll('input[type="password"]')]
+            .filter(input => {
+                const style = window.getComputedStyle(input);
+                return style.display !== 'none' && style.visibility !== 'hidden';
+            });
+        const loginForms = [...document.querySelectorAll('form')]
+            .filter(form => form.querySelector('input[type="password"]'));
+        const bodyText = document.body ? document.body.innerText.toLowerCase() : '';
+        const accountSignals = [
+            '[href*="logout"]',
+            '[href*="signout"]',
+            'button[aria-label*="account" i]',
+            '[data-testid*="account" i]',
+            '[data-testid*="profile" i]',
+            '.account',
+            '.profile',
+            '.user-menu',
+            '.dashboard'
+        ].some(selector => {
+            try { return Boolean(document.querySelector(selector)); } catch { return false; }
+        });
+
+        return {
+            errorMessages: [...new Set(errorMessages)].slice(0, 8),
+            hasPasswordInput: passwordInputs.length > 0,
+            hasLoginForm: loginForms.length > 0,
+            bodyText,
+            accountSignals,
+            successMessages: [...new Set(successMessages)].slice(0, 8),
+            title: document.title || '',
+            currentUrl: window.location.href
+        };
+    });
+
+    const afterCookieNames = await readCookieNames(page);
+    const ignoredCookieNames = new Set(['lpc_trace', 'lpc_attempt']);
+    const newCookieNames = afterCookieNames.filter(name => !originalCookieNames.includes(name) && !ignoredCookieNames.has(name));
+    const errorMessage = genericCheck.errorMessages.join(' | ');
+    const errorLower = errorMessage.toLowerCase();
+    const bodyLower = genericCheck.bodyText || '';
+    const mfaSignals = ['mfa', '2fa', 'two-factor', 'verification code', 'authenticator', 'otp', 'doğrulama', 'iki faktör'];
+
+    const evidence = {
+        urlChanged,
+        currentUrl,
+        title: genericCheck.title || title,
+        hasLoginForm: genericCheck.hasLoginForm,
+        hasPasswordInput: genericCheck.hasPasswordInput,
+        accountSignals: genericCheck.accountSignals,
+        errorMessages: genericCheck.errorMessages,
+        successMessages: genericCheck.successMessages,
+        newCookieNames
+    };
+
+    if (mfaSignals.some(signal => bodyLower.includes(signal) || errorLower.includes(signal))) {
+        return {
+            success: null,
+            mfaRequired: true,
+            reason: 'MFA/2FA sinyali tespit edildi',
+            errorMessage: errorMessage || 'MFA/2FA Required',
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    const successMessage = genericCheck.successMessages.join(' | ');
+    const successTextSignals = [
+        'login successful',
+        'logged in successfully',
+        'giriş başarılı',
+        'giris basarili',
+        'başarıyla giriş',
+        'basariyla giris'
+    ];
+
+    if (successMessage || successTextSignals.some(signal => bodyLower.includes(signal))) {
+        return {
+            success: true,
+            reason: successMessage ? `Başarı mesajı: ${successMessage}` : 'Başarı mesajı tespit edildi',
+            errorMessage: null,
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    if (errorMessage) {
+        return {
+            success: false,
+            reason: `Hata: ${errorMessage}`,
+            errorMessage,
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    if (genericCheck.accountSignals) {
+        return {
+            success: true,
+            reason: 'Hesap/profil alanı tespit edildi',
+            errorMessage: null,
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    if (urlChanged && !genericCheck.hasPasswordInput && !genericCheck.hasLoginForm) {
+        return {
+            success: true,
+            reason: 'URL değişti ve login formu kayboldu',
+            errorMessage: null,
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    if (newCookieNames.some(name => /(session|auth|token|sid|jwt|logged|login)/i.test(name)) && !genericCheck.hasPasswordInput) {
+        return {
+            success: true,
+            reason: `Auth/session çerezi tespit edildi: ${newCookieNames.join(', ')}`,
+            errorMessage: null,
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    if (genericCheck.hasPasswordInput || genericCheck.hasLoginForm) {
+        return {
+            success: false,
+            reason: 'Login formu hala görünür',
+            errorMessage: 'Login form still visible',
+            url: currentUrl,
+            title: evidence.title,
+            evidence
+        };
+    }
+
+    return {
+        success: null,
+        reason: 'Sonuç belirsiz; manuel karşılaştırma gerekli',
+        errorMessage: null,
+        url: currentUrl,
+        title: evidence.title,
+        evidence
+    };
 }
 
 
@@ -1331,10 +1625,10 @@ async function saveSuccessfulLogin(result, owner) {
     if (!db) return;
     try {
         await db.collection('successful_logins').insertOne(buildStoredResult(result, owner));
-        sendLog(`💾 Başarılı giriş MongoDB'ye kaydedildi: ${result.username} @ ${result.baseUrl}`, 'success', owner.id);
+        sendLog(`💾 Başarılı giriş DB'ye kaydedildi: ${result.username} @ ${result.baseUrl}`, 'success', owner.id);
     } catch (err) {
-        console.error('MongoDB kayıt hatası:', err);
-        sendLog(`❌ MongoDB kayıt hatası: ${err.message}`, 'error', owner.id);
+        console.error('DB kayıt hatası:', err);
+        sendLog(`❌ DB kayıt hatası: ${err.message}`, 'error', owner.id);
     }
 }
 
@@ -1377,18 +1671,50 @@ async function saveUserAuditLog(req, action, target, changes = {}) {
     });
 }
 
-async function connectMongo() {
+async function connectDatabase() {
     try {
-        const mongoConfig = getMongoConfig();
-        mongoStatus = {
+        const configuredProvider = getDbProvider();
+        dbStatus = {
+            provider: configuredProvider === 'elastic' ? 'elasticsearch' : configuredProvider,
+            configured: true,
+            attempted: true,
+            connected: false,
+            error: null
+        };
+        mongoStatus = dbStatus;
+        const databaseConfig = getDatabaseConfig();
+        dbStatus = {
+            provider: databaseConfig.provider,
             configured: true,
             attempted: true,
             connected: false,
             error: null,
-            source: mongoConfig.source,
-            database: mongoConfig.dbName,
-            authMode: mongoConfig.authMode
         };
+        mongoStatus = dbStatus;
+
+        if (databaseConfig.provider === 'elasticsearch') {
+            const elasticConfig = databaseConfig.elastic;
+            dbStatus.source = elasticConfig.source;
+            dbStatus.database = elasticConfig.indexPrefix;
+            dbStatus.authMode = elasticConfig.authMode;
+
+            console.log(`Elasticsearch bağlantısı başlatılıyor... env=${elasticConfig.source} indexPrefix=${elasticConfig.indexPrefix} auth=${elasticConfig.authMode}`);
+            const elasticDb = new ElasticDatabase(elasticConfig);
+            await elasticDb.ping();
+            await elasticDb.ensureSchema();
+            db = elasticDb;
+            dbClient = elasticDb;
+            mongoClient = null;
+            dbStatus.connected = true;
+            dbStatus.indexes = 'ready';
+            console.log('✅ Elasticsearch bağlantısı başarılı');
+            return elasticDb;
+        }
+
+        const mongoConfig = databaseConfig.mongo || getMongoConfig();
+        dbStatus.source = mongoConfig.source;
+        dbStatus.database = mongoConfig.dbName;
+        dbStatus.authMode = mongoConfig.authMode;
 
         console.log(`MongoDB bağlantısı başlatılıyor... env=${mongoConfig.source} db=${mongoConfig.dbName} auth=${mongoConfig.authMode}`);
         const client = new MongoClient(mongoConfig.uri, mongoConfig.clientOptions);
@@ -1397,13 +1723,14 @@ async function connectMongo() {
             await mongoClient.close().catch(() => {});
         }
         mongoClient = client;
+        dbClient = client;
         db = client.db(mongoConfig.dbName);
         await db.command({ ping: 1 });
-        mongoStatus.connected = true;
-        mongoStatus.database = db.databaseName;
+        dbStatus.connected = true;
+        dbStatus.database = db.databaseName;
         
         const indexStatus = await ensureMongoIndexes(db);
-        mongoStatus.indexes = indexStatus.supported ? 'ready' : 'unsupported';
+        dbStatus.indexes = indexStatus.supported ? 'ready' : 'unsupported';
         if (!indexStatus.supported) {
             console.warn(`⚠ ${indexStatus.warning}; bağlantı kullanılmaya devam edecek.`);
         }
@@ -1411,42 +1738,46 @@ async function connectMongo() {
         console.log('✅ MongoDB bağlantısı başarılı');
         return client;
     } catch (err) {
-        console.error('❌ MongoDB bağlantı hatası:', err.message);
+        console.error('❌ DB bağlantı hatası:', err.message);
         if (mongoClient) {
             await mongoClient.close().catch(() => {});
         }
         mongoClient = null;
+        dbClient = null;
         db = null;
-        mongoStatus.configured = !err.message.includes('connection string missing');
-        mongoStatus.attempted = mongoStatus.configured;
-        mongoStatus.connected = false;
-        mongoStatus.error = err.message;
+        dbStatus.configured = !/connection string missing|url missing/i.test(err.message);
+        dbStatus.attempted = dbStatus.configured;
+        dbStatus.connected = false;
+        dbStatus.error = err.message;
+        mongoStatus = dbStatus;
         return null;
     }
 }
 
 async function ensureMongoReady() {
     if (!db) {
-        await connectMongo();
+        await connectDatabase();
     }
     if (!db) return false;
 
     try {
         await db.command({ ping: 1 });
-        mongoStatus.connected = true;
-        mongoStatus.error = null;
+        dbStatus.connected = true;
+        dbStatus.error = null;
+        mongoStatus = dbStatus;
         return true;
     } catch (err) {
-        console.error('❌ MongoDB ping hatası:', err.message);
-        mongoStatus.connected = false;
-        mongoStatus.error = err.message;
+        console.error('❌ DB ping hatası:', err.message);
+        dbStatus.connected = false;
+        dbStatus.error = err.message;
         if (mongoClient) {
             await mongoClient.close().catch(() => {});
         }
         mongoClient = null;
+        dbClient = null;
         db = null;
-        await connectMongo();
-        return Boolean(db && mongoStatus.connected);
+        await connectDatabase();
+        return Boolean(db && dbStatus.connected);
     }
 }
 
@@ -1477,6 +1808,240 @@ async function initializeProxyPool() {
     }
 }
 
+async function runSingleLoginAttempt({ browser, testState, baseUrl, username, password, runId, itemIndex, attemptNumber, owner }) {
+    let context = null;
+    let page = null;
+    let originalUrl = '';
+    let originalCookieNames = [];
+
+    try {
+        try {
+            context = await browser.createBrowserContext();
+            sendLog(`🔒 İzole browser context oluşturuldu (${attemptNumber}/${CHECK_REPEAT_COUNT})`, 'info', owner.id);
+        } catch (contextError) {
+            console.warn('İzole context desteklenmiyor, default context kullanılıyor:', contextError.message);
+            context = browser.defaultBrowserContext();
+            sendLog(`🔓 Default context kullanılıyor (${attemptNumber}/${CHECK_REPEAT_COUNT})`, 'info', owner.id);
+        }
+
+        if (testState.stopRequested) {
+            throw new Error('TEST_STOPPED');
+        }
+
+        page = await context.newPage();
+        page.setDefaultNavigationTimeout(CHECK_NAVIGATION_TIMEOUT_MS);
+
+        await proxyPool.clearCookies(page);
+        sendLog(`🍪 Cookie'ler temizlendi (${attemptNumber}/${CHECK_REPEAT_COUNT})`, 'info', owner.id);
+
+        const userAgent = proxyPool.getUserAgent();
+        await page.setUserAgent(userAgent);
+        sendLog(`🔄 User-Agent: ${userAgent.slice(0, 50)}...`, 'info', owner.id);
+
+        const url = normalizeUrl(baseUrl);
+        if (!(await isAllowedCheckUrl(url))) {
+            throw new Error(`CHECK_BLOCKED_HOST: ${new URL(url).hostname} izinli değil`);
+        }
+
+        await proxyPool.randomDelay(300, 1000);
+        await page.goto(url, {
+            waitUntil: 'domcontentloaded',
+            timeout: CHECK_NAVIGATION_TIMEOUT_MS
+        });
+        originalUrl = page.url();
+        sendLog(`📍 Sayfa yüklendi (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${originalUrl}`, 'info', owner.id);
+
+        originalCookieNames = await readCookieNames(page);
+        const syntheticCookies = await setSyntheticAttemptCookies(page, originalUrl, runId, `${itemIndex + 1}-${attemptNumber}`, username);
+        sendLog(`🍪 Sentetik trace cookie eklendi: ${syntheticCookies.join(', ')}`, 'info', owner.id);
+
+        await proxyPool.simulateHumanBehavior(page);
+        await proxyPool.randomDelay(500, 1500);
+
+        const handler = new UniversalFormHandler(page);
+        let formInfo = null;
+
+        if (baseUrl.includes('booking.com')) {
+            try {
+                formInfo = await handler.findBookingLoginForm();
+                if (formInfo) {
+                    sendLog(`🔍 Booking.com özel form bulundu (${attemptNumber}/${CHECK_REPEAT_COUNT})`, 'info', owner.id);
+                    await handler.fillBookingForm(formInfo, username, password);
+                } else {
+                    formInfo = await handler.findLoginForm();
+                    if (formInfo) {
+                        await handler.fillAndSubmit(formInfo, username, password);
+                    }
+                }
+            } catch (err) {
+                sendLog(`⚠ Booking form hatası (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${err.message}`, 'error', owner.id);
+                throw err;
+            }
+        } else {
+            formInfo = await handler.findLoginForm();
+            if (formInfo) {
+                sendLog(`🔍 Form tipi (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${formInfo.type}`, 'info', owner.id);
+                await handler.fillAndSubmit(formInfo, username, password);
+            }
+        }
+
+        if (!formInfo) {
+            throw new Error('Login formu bulunamadı');
+        }
+
+        await proxyPool.randomDelay(300, 800);
+        await delay(CHECK_POST_SUBMIT_WAIT_MS);
+        await proxyPool.randomDelay(500, 1500);
+
+        const verification = await verifyLoginSuccess(page, originalUrl, originalCookieNames);
+        const attempt = {
+            attempt: attemptNumber,
+            status: 'uncertain',
+            success: null,
+            message: '',
+            reason: verification.reason || '',
+            urlAfterLogin: verification.url || page.url(),
+            titleAfterLogin: verification.title || '',
+            evidence: verification.evidence || null,
+            syntheticCookies
+        };
+
+        if (verification.mfaRequired) {
+            attempt.status = 'mfa_required';
+            attempt.success = null;
+            attempt.message = 'MFA REQUIRED - PASSWORD CORRECT';
+            sendLog(`🛡 2FA GEREKLİ (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${username}`, 'info', owner.id);
+        } else if (verification.success === true) {
+            attempt.status = 'success';
+            attempt.success = true;
+            attempt.message = 'LOGIN OK - ' + verification.reason;
+            sendLog(`✅ BAŞARILI (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${username}`, 'success', owner.id);
+        } else if (verification.success === false) {
+            attempt.status = 'fail';
+            attempt.success = false;
+            attempt.message = 'LOGIN FAIL - ' + verification.reason;
+            sendLog(`❌ BAŞARISIZ (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${username} - ${verification.reason}`, 'fail', owner.id);
+        } else {
+            attempt.status = 'uncertain';
+            attempt.success = null;
+            attempt.message = 'UNCERTAIN - ' + verification.reason;
+            sendLog(`❔ BELİRSİZ (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${username} - ${verification.reason}`, 'info', owner.id);
+        }
+
+        return attempt;
+    } catch (err) {
+        const errorMsg = err.message || 'Bilinmeyen hata';
+        if (errorMsg === 'TEST_STOPPED') {
+            throw err;
+        }
+        const status = errorMsg.startsWith('CHECK_BLOCKED_HOST') ? 'blocked' : 'error';
+        sendLog(`⚠ HATA (${attemptNumber}/${CHECK_REPEAT_COUNT}) ${username}: ${errorMsg}`, 'error', owner.id);
+        return {
+            attempt: attemptNumber,
+            status,
+            success: null,
+            message: errorMsg,
+            reason: errorMsg,
+            urlAfterLogin: page && !page.isClosed() ? page.url() : null,
+            titleAfterLogin: page && !page.isClosed() ? await page.title().catch(() => '') : '',
+            evidence: null,
+            syntheticCookies: []
+        };
+    } finally {
+        try {
+            if (page && !page.isClosed()) {
+                await page.close();
+            }
+        } catch (closeError) {
+            console.warn('Sayfa kapatma hatası:', closeError.message);
+        }
+
+        try {
+            if (context && context !== browser.defaultBrowserContext()) {
+                await context.close();
+            }
+        } catch (closeError) {
+            console.warn('Context kapatma hatası:', closeError.message);
+        }
+
+        sendLog(`🧹 Session kapatıldı (${attemptNumber}/${CHECK_REPEAT_COUNT}): ${username}`, 'info', owner.id);
+    }
+}
+
+function summarizeAttempt(attempt) {
+    if (!attempt) return '';
+    return `#${attempt.attempt} ${attempt.status}: ${attempt.reason || attempt.message || ''}`.trim();
+}
+
+function applyRepeatedAttemptResult(result, attempts) {
+    const successAttempts = attempts.filter(attempt => attempt.status === 'success');
+    const mfaAttempts = attempts.filter(attempt => attempt.status === 'mfa_required');
+    const failAttempts = attempts.filter(attempt => attempt.status === 'fail');
+    const blockedAttempts = attempts.filter(attempt => attempt.status === 'blocked');
+    const errorAttempts = attempts.filter(attempt => attempt.status === 'error');
+    const attemptSummary = attempts.map(summarizeAttempt).join(' | ');
+    const lastSignal = [...successAttempts, ...mfaAttempts, ...failAttempts, ...attempts].at(-1);
+
+    result.checkAttempts = attempts;
+    result.syntheticCookies = attempts.flatMap(attempt => attempt.syntheticCookies || []);
+    result.urlAfterLogin = lastSignal?.urlAfterLogin || null;
+    result.titleAfterLogin = lastSignal?.titleAfterLogin || '';
+    result.evidence = {
+        repeatedCheck: true,
+        repeatCount: attempts.length,
+        attempts: attempts.map(attempt => ({
+            attempt: attempt.attempt,
+            status: attempt.status,
+            success: attempt.success,
+            reason: attempt.reason,
+            urlAfterLogin: attempt.urlAfterLogin,
+            titleAfterLogin: attempt.titleAfterLogin,
+            evidence: attempt.evidence
+        }))
+    };
+
+    if (mfaAttempts.length > 0) {
+        result.success = null;
+        result.status = 'mfa_required';
+        result.message = mfaAttempts.length === attempts.length
+            ? `MFA REQUIRED CONFIRMED (${mfaAttempts.length}/${attempts.length})`
+            : `MFA REQUIRED UNSTABLE (${mfaAttempts.length}/${attempts.length})`;
+        result.details = attemptSummary;
+        return;
+    }
+
+    if (successAttempts.length > 0) {
+        result.success = true;
+        result.status = 'success';
+        result.message = successAttempts.length === attempts.length
+            ? `LOGIN OK CONFIRMED (${successAttempts.length}/${attempts.length})`
+            : `LOGIN OK UNSTABLE (${successAttempts.length}/${attempts.length}) - en az bir deneme giriş yaptı`;
+        result.details = attemptSummary;
+        return;
+    }
+
+    if (failAttempts.length === attempts.length) {
+        result.success = false;
+        result.status = 'fail';
+        result.message = `LOGIN FAIL CONFIRMED (${failAttempts.length}/${attempts.length})`;
+        result.details = attemptSummary;
+        return;
+    }
+
+    if (blockedAttempts.length === attempts.length || errorAttempts.length === attempts.length) {
+        result.success = null;
+        result.status = blockedAttempts.length === attempts.length ? 'blocked' : 'error';
+        result.message = attemptSummary || 'CHECK FAILED';
+        result.details = attemptSummary;
+        return;
+    }
+
+    result.success = null;
+    result.status = 'uncertain';
+    result.message = `UNCERTAIN (${attempts.length} deneme tutarsız)`;
+    result.details = attemptSummary;
+}
+
 // ==================== ANA TEST FONKSİYONU ====================
 async function runAllTests(testItems, owner, runId) {
     const testState = {
@@ -1498,7 +2063,9 @@ async function runAllTests(testItems, owner, runId) {
         timestamp: new Date().toISOString(),
         urlAfterLogin: null,
         titleAfterLogin: null,
-        details: null
+        details: null,
+        evidence: null,
+        syntheticCookies: []
     }));
     testState.results = results;
     await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
@@ -1588,114 +2155,52 @@ async function runAllTests(testItems, owner, runId) {
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         await delay(CHECK_PROGRESS_DELAY_MS);
 
-        let context = null;
-        let page = null;
-        let originalUrl = '';
-        
         try {
-            try {
-                context = await browser.createIncognitoBrowserContext();
-                sendLog(`🔒 Incognito context oluşturuldu`, 'info', owner.id);
-            } catch (incognitoError) {
-                console.warn('Incognito desteklenmiyor, default context kullanılıyor:', incognitoError.message);
-                context = browser.defaultBrowserContext();
-                sendLog(`🔓 Default context kullanılıyor`, 'info', owner.id);
-            }
-            
-            if (testState.stopRequested) {
-                throw new Error('TEST_STOPPED');
-            }
-            
-            page = await context.newPage();
-            page.setDefaultNavigationTimeout(CHECK_NAVIGATION_TIMEOUT_MS);
-            
-            await proxyPool.clearCookies(page);
-            sendLog(`🍪 Cookie\'ler temizlendi`, 'info', owner.id);
-            
-            const userAgent = proxyPool.getUserAgent();
-            await page.setUserAgent(userAgent);
-            sendLog(`🔄 User-Agent: ${userAgent.slice(0, 50)}...`, 'info', owner.id);
-            
-            const url = normalizeUrl(baseUrl);
-            if (!(await isAllowedCheckUrl(url))) {
-                throw new Error(`CHECK_BLOCKED_HOST: ${new URL(url).hostname} izinli değil`);
-            }
-            
-            await proxyPool.randomDelay(300, 1000);
-            await page.goto(url, { 
-                waitUntil: 'domcontentloaded', 
-                timeout: CHECK_NAVIGATION_TIMEOUT_MS 
-            });
-            originalUrl = page.url();
-            sendLog(`📍 Sayfa yüklendi: ${originalUrl}`, 'info', owner.id);
-            
-            await proxyPool.simulateHumanBehavior(page);
-            await proxyPool.randomDelay(500, 1500);
+            const attempts = [];
+            for (let attemptNumber = 1; attemptNumber <= CHECK_REPEAT_COUNT; attemptNumber++) {
+                if (testState.stopRequested) {
+                    throw new Error('TEST_STOPPED');
+                }
 
-            // ========== FORM BUL ==========
-            const handler = new UniversalFormHandler(page);
-            let formInfo = null;
-            
-            // Booking.com için özel işlem
-            if (baseUrl.includes('booking.com')) {
-                try {
-                    formInfo = await handler.findBookingLoginForm();
-                    if (formInfo) {
-                        sendLog(`🔍 Booking.com özel form bulundu`, 'info', owner.id);
-                        await handler.fillBookingForm(formInfo, username, password);
-                    } else {
-                        // Standart form handler'ı dene
-                        formInfo = await handler.findLoginForm();
-                        if (formInfo) {
-                            await handler.fillAndSubmit(formInfo, username, password);
-                        }
-                    }
-                } catch (err) {
-                    sendLog(`⚠ Booking form hatası: ${err.message}`, 'error', owner.id);
-                    throw err;
-                }
-            } else {
-                // Diğer siteler için normal handler
-                formInfo = await handler.findLoginForm();
-                if (formInfo) {
-                    sendLog(`🔍 Form tipi: ${formInfo.type}`, 'info', owner.id);
-                    await handler.fillAndSubmit(formInfo, username, password);
+                sendLog(`🔁 Deneme ${attemptNumber}/${CHECK_REPEAT_COUNT}: ${username} @ ${baseUrl}`, 'info', owner.id);
+                const attempt = await runSingleLoginAttempt({
+                    browser,
+                    testState,
+                    baseUrl,
+                    username,
+                    password,
+                    runId,
+                    itemIndex: i,
+                    attemptNumber,
+                    owner
+                });
+                attempts.push(attempt);
+
+                result.checkAttempts = attempts;
+                result.details = attempts.map(summarizeAttempt).join(' | ');
+                result.message = `ÇALIŞIYOR (${attemptNumber}/${CHECK_REPEAT_COUNT})`;
+                result.timestamp = new Date().toISOString();
+                await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
+
+                if (attemptNumber < CHECK_REPEAT_COUNT && !testState.stopRequested) {
+                    await delay(Math.min(CHECK_ATTEMPT_DELAY_MS, 1500));
                 }
             }
-            
-            if (!formInfo) {
-                throw new Error('Login formu bulunamadı');
-            }
-            
-            await proxyPool.randomDelay(300, 800);
-            await delay(CHECK_POST_SUBMIT_WAIT_MS);
-            await proxyPool.randomDelay(500, 1500);
-            
-            // ========== SONUÇ KONTROL ==========
-            const verification = await verifyLoginSuccess(page, originalUrl);
-            
-            result.urlAfterLogin = verification.url || page.url();
-            result.titleAfterLogin = verification.title || '';
-            result.details = verification.reason || '';
-            
-            if (verification.mfaRequired) {
-                result.success = null;
-                result.status = 'mfa_required';
-                result.message = 'MFA REQUIRED - PASSWORD CORRECT';
-                sendLog(`🛡 2FA GEREKLİ: ${username}`, 'info', owner.id);
-            } else if (verification.success) {
-                result.success = true;
-                result.status = 'success';
-                result.message = 'LOGIN OK - ' + verification.reason;
-                sendLog(`✅ BAŞARILI: ${username}`, 'success', owner.id);
+
+            applyRepeatedAttemptResult(result, attempts);
+            result.timestamp = new Date().toISOString();
+
+            if (result.status === 'mfa_required') {
+                sendLog(`🛡 2FA GEREKLİ FINAL: ${username} - ${result.message}`, 'info', owner.id);
+            } else if (result.success === true) {
+                sendLog(`✅ BAŞARILI FINAL: ${username} - ${result.message}`, 'success', owner.id);
                 await saveSuccessfulLogin(result, owner);
+            } else if (result.success === false) {
+                sendLog(`❌ BAŞARISIZ FINAL: ${username} - ${result.message}`, 'fail', owner.id);
             } else {
-                result.success = false;
-                result.status = 'fail';
-                result.message = 'LOGIN FAIL - ' + verification.reason;
-                sendLog(`❌ BAŞARISIZ: ${username} - ${verification.reason}`, 'fail', owner.id);
+                sendLog(`❔ BELİRSİZ FINAL: ${username} - ${result.message}`, 'info', owner.id);
             }
-            
+
             await saveCheckResult(result, owner);
             
         } catch (err) {
@@ -1714,25 +2219,6 @@ async function runAllTests(testItems, owner, runId) {
                 sendLog(`⚠ HATA ${username}: ${errorMsg}`, 'error', owner.id);
             }
             await saveCheckResult(result, owner);
-            
-        } finally {
-            try {
-                if (page && !page.isClosed()) {
-                    await page.close();
-                }
-            } catch (closeError) {
-                console.warn('Sayfa kapatma hatası:', closeError.message);
-            }
-            
-            try {
-                if (context && context !== browser.defaultBrowserContext()) {
-                    await context.close();
-                }
-            } catch (closeError) {
-                console.warn('Context kapatma hatası:', closeError.message);
-            }
-            
-            sendLog(`🧹 Session kapatıldı: ${username}`, 'info', owner.id);
         }
 
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
@@ -1756,10 +2242,11 @@ async function runAllTests(testItems, owner, runId) {
     const okCount = results.filter(x => x.status === 'success').length;
     const failCount = results.filter(x => x.status === 'fail').length;
     const mfaCount = results.filter(x => x.status === 'mfa_required').length;
+    const uncertainCount = results.filter(x => x.status === 'uncertain').length;
     const cancelledCount = results.filter(x => x.status === 'cancelled').length;
     const errorCount = results.filter(x => x.status === 'error' || x.status === 'blocked').length;
     
-    sendLog(`🏁 BİTİŞ – ✅:${okCount} ❌:${failCount} 🛡:${mfaCount} ⏹:${cancelledCount} ⚠:${errorCount}`, 'info', owner.id);
+    sendLog(`🏁 BİTİŞ – ✅:${okCount} ❌:${failCount} 🛡:${mfaCount} ❔:${uncertainCount} ⏹:${cancelledCount} ⚠:${errorCount}`, 'info', owner.id);
     return results;
 }
 
@@ -1788,7 +2275,7 @@ app.post('/api/auth/login', async (req, res) => {
             { $set: { lastLoginAt: new Date() } }
         );
         const cookie = createSessionCookie(user);
-        const secure = IS_PRODUCTION ? '; Secure' : '';
+        const secure = shouldUseSecureCookie(req) ? '; Secure' : '';
         res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${secure}`);
         await saveSessionLog(req, 'login_success', {
             userId: String(user._id),
@@ -1806,12 +2293,26 @@ app.post('/api/auth/logout', async (req, res) => {
     if (user) {
         await saveSessionLog(req, 'logout', { userId: user.id, username: user.username, role: user.role });
     }
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+    const secure = shouldUseSecureCookie(req) ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
     res.json({ ok: true });
 });
 
-app.get('/api/auth/me', requireAuth, (req, res) => {
-    res.json({ user: req.user });
+app.get('/api/auth/me', async (req, res, next) => {
+    try {
+        const session = getSessionUser(req);
+        const mongoReady = await ensureMongoReady();
+        if (!session || !mongoReady || !ObjectId.isValid(session.id)) {
+            return res.json({ user: null });
+        }
+        const user = await db.collection('users').findOne({ _id: new ObjectId(session.id) });
+        if (!user || user.active === false) {
+            return res.json({ user: null });
+        }
+        res.json({ user: publicUser(user) });
+    } catch (err) {
+        next(err);
+    }
 });
 
 // ==================== STOP API ====================
@@ -1871,16 +2372,18 @@ app.post('/api/start', requireAuth, requirePermission(PERMISSIONS.CHECKER_RUN), 
         }
 
         const hosts = await getAllowedHosts();
-        const blockedHosts = [...new Set(testItems
-            .filter(item => !isAllowedCheckUrl(item.baseUrl))
-            .map(item => {
-                try { return new URL(normalizeUrl(item.baseUrl)).hostname.toLowerCase(); } 
-                catch { return item.baseUrl; }
-            }))];
+        const blockedHosts = [];
+        for (const item of testItems) {
+            if (!(await isAllowedCheckUrl(item.baseUrl))) {
+                try { blockedHosts.push(new URL(normalizeUrl(item.baseUrl)).hostname.toLowerCase()); }
+                catch { blockedHosts.push(item.baseUrl); }
+            }
+        }
+        const uniqueBlockedHosts = [...new Set(blockedHosts)];
 
-        if (blockedHosts.length > 0) {
+        if (uniqueBlockedHosts.length > 0) {
             return res.status(400).json({
-                error: `İzinli olmayan host: ${blockedHosts.join(', ')}`,
+                error: `İzinli olmayan host: ${uniqueBlockedHosts.join(', ')}`,
                 allowedHosts: hosts
             });
         }
@@ -2061,7 +2564,7 @@ app.get('/api/admin/allowed-hosts', requireAuth, requirePermission(PERMISSIONS.H
             dynamicHosts: settings?.allowedHosts || [],
             rootDomains: settings?.rootDomains || [],
             rootDomainEnforced: settings?.enforceRootDomains || false,
-            persistence: db ? 'mongodb' : 'memory'
+            persistence: db ? (dbStatus.provider || 'db') : 'memory'
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -2372,6 +2875,7 @@ app.get('/health', async (req, res) => {
         service: 'panelcheckers',
         db: db ? 'connected' : 'disabled',
         auth: db ? 'enabled' : 'disabled',
+        database: dbStatus,
         mongo: mongoStatus,
         proxyPool: proxyPool.proxies.length,
         uptime: process.uptime()
@@ -2468,7 +2972,7 @@ app.patch('/api/settings', requireAuth, requirePermission(PERMISSIONS.HOSTS_MANA
 
 // ==================== SERVER BAŞLATMA ====================
 (async () => {
-    await connectMongo();
+    await connectDatabase();
     await initializeProxyPool();
     const server = app.listen(PORT, HOST, () => {
         console.log(`✅ Sunucu çalışıyor: http://${HOST}:${PORT}`);
