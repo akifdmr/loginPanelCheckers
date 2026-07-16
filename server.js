@@ -541,11 +541,15 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
         args
     };
 
-    // 1. Eğer PUPPETEER_EXECUTABLE_PATH ortam değişkeni varsa onu kullan
+    // 1. Eğer PUPPETEER_EXECUTABLE_PATH ortam değişkeni varsa ve gerçekten varsa onu kullan
     const configuredPath = String(process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
     if (configuredPath) {
-        launchOptions.executablePath = configuredPath;
-        return launchOptions;
+        if (fsSync.existsSync(configuredPath)) {
+            launchOptions.executablePath = configuredPath;
+            return launchOptions;
+        }
+        console.warn(`⚠ PUPPETEER_EXECUTABLE_PATH bulunamadı, fallback deneniyor: ${configuredPath}`);
+        delete process.env.PUPPETEER_EXECUTABLE_PATH;
     }
 
     // 2. Geliştirme ortamında yerel Chrome'u dene (Mac için)
@@ -567,7 +571,7 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
         console.warn('⚠ puppeteer.executablePath() hatası:', err.message);
     }
 
-    // 4. Son çare: PUPPETEER_CACHE_DIR altındaki chrome'u manuel ara
+    // 4. Render/Linux ve Puppeteer cache altındaki chrome'u manuel ara
     const cacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(__dirname, '.cache', 'puppeteer');
     const possiblePaths = [
         path.join(cacheDir, 'chrome', 'mac_arm-150.0.7871.24', 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
@@ -575,7 +579,13 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
         path.join(cacheDir, 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
         // varsayılan puppeteer cache yapısı
         path.join(cacheDir, 'chrome', 'stable', 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        '/opt/render/project/src/.cache/puppeteer/chrome/linux/chrome-linux64/chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
     ];
+    possiblePaths.push(...findChromeExecutables(cacheDir));
     for (const p of possiblePaths) {
         if (fsSync.existsSync(p)) {
             launchOptions.executablePath = p;
@@ -586,6 +596,36 @@ function getBrowserLaunchOptions(runId = 'manual', browserProxyUrl = '') {
 
     console.warn('⚠ Chrome bulunamadı, Puppeteer varsayılan davranışı kullanacak.');
     return launchOptions;
+}
+
+function findChromeExecutables(rootDir, maxDepth = 5) {
+    const found = [];
+    const seen = new Set();
+
+    function walk(dir, depth) {
+        if (!dir || depth > maxDepth || seen.has(dir)) return;
+        seen.add(dir);
+        let entries = [];
+        try {
+            entries = fsSync.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return;
+        }
+
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                walk(fullPath, depth + 1);
+                continue;
+            }
+            if (entry.isFile() && /^(chrome|chromium|google-chrome|Google Chrome for Testing)$/.test(entry.name)) {
+                found.push(fullPath);
+            }
+        }
+    }
+
+    walk(rootDir, 0);
+    return found;
 }
 
 async function runBrowserSmokeTest(browser) {
