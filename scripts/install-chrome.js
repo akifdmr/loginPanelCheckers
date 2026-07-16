@@ -16,7 +16,7 @@ console.log(`Installing Chrome for Puppeteer into ${cacheDir}`);
 
 execFileSync(
     process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['@puppeteer/browsers', 'install', 'chrome@stable'],
+    ['puppeteer', 'browsers', 'install', 'chrome'],
     {
         stdio: 'inherit',
         env: {

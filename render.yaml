@@ -6,7 +6,7 @@ services:
     buildCommand: |
       npm ci
       export PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer
-      npx @puppeteer/browsers install chrome@stable
+      npx puppeteer browsers install chrome
     preDeployCommand: npm run migrate
     startCommand: npm start
     healthCheckPath: /health
