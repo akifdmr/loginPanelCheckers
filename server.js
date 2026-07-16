@@ -10,8 +10,13 @@ const https = require('https');
 const net = require('net');
 
 const argv = yargs(process.argv.slice(2)).argv;
-process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR
-    || (process.env.RENDER ? '/opt/render/project/src/.cache/puppeteer' : path.join(__dirname, '.cache', 'puppeteer'));
+const RENDER_PUPPETEER_CACHE_DIR = '/opt/render/project/src/.cache/puppeteer';
+const configuredPuppeteerCacheDir = String(process.env.PUPPETEER_CACHE_DIR || '').trim();
+process.env.PUPPETEER_CACHE_DIR = process.env.RENDER
+    ? ((!configuredPuppeteerCacheDir || configuredPuppeteerCacheDir === '.cache/puppeteer' || !path.isAbsolute(configuredPuppeteerCacheDir))
+        ? RENDER_PUPPETEER_CACHE_DIR
+        : configuredPuppeteerCacheDir)
+    : (configuredPuppeteerCacheDir || path.join(__dirname, '.cache', 'puppeteer'));
 
 const puppeteer = require('puppeteer');
 const { MongoClient, ObjectId } = require('mongodb');
