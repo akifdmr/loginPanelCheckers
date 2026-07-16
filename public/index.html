@@ -547,6 +547,10 @@
             return;
         }
         const data = await readJson(res, 'Oturum bilgisi okunamadı.');
+        if (!data || !data.user) {
+            showLogin();
+            return;
+        }
         showApp(data.user);
         await initializeAuthorizedViews();
     }
@@ -1578,15 +1582,26 @@
     //  INIT
     // ========================================================================
     window.onload = async () => {
-        document.getElementById('proxyInput').addEventListener('keydown', event => {
-            if (event.key === 'Enter') { event.preventDefault();
-                addProxy(); }
-        });
-        document.getElementById('baseUrlInput').addEventListener('keydown', event => {
-            if (event.key === 'Enter') { event.preventDefault();
-                formatWithBaseUrl(); }
-        });
-        await checkSession();
+        const proxyInput = document.getElementById('proxyInput');
+        if (proxyInput) {
+            proxyInput.addEventListener('keydown', event => {
+                if (event.key === 'Enter') { event.preventDefault();
+                    addProxy(); }
+            });
+        }
+        const baseUrlInput = document.getElementById('baseUrlInput');
+        if (baseUrlInput) {
+            baseUrlInput.addEventListener('keydown', event => {
+                if (event.key === 'Enter') { event.preventDefault();
+                    formatWithBaseUrl(); }
+            });
+        }
+        try {
+            await checkSession();
+        } catch (err) {
+            console.warn('Oturum kontrolü başarısız:', err);
+            showLogin();
+        }
     };
 </script>
 </body>
